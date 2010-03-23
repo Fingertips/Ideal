@@ -1,6 +1,5 @@
 require 'rubygems'
 require 'test/unit'
-require 'active_support'
 require 'mocha'
 
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
@@ -16,6 +15,19 @@ end
 class SubclassGateway < SimpleTestGateway
 end
 
+class Hash #:nodoc:
+  # Return a new hash with all keys converted to symbols.
+  def symbolize_keys
+    inject({}) do |options, (key, value)|
+      options[(key.to_sym rescue key) || key] = value
+      options
+    end
+  end
+  # Destructively convert all keys to symbols.
+  def symbolize_keys!
+    self.replace(self.symbolize_keys)
+  end
+end
 
 module ActiveMerchant
   module Assertions
@@ -99,50 +111,8 @@ module Test
 
       include ActiveMerchant::Billing
       include ActiveMerchant::Assertions
-      include ActiveMerchant::Utils
 
       private
-      def credit_card(number = '4242424242424242', options = {})
-        defaults = {
-          :number => number,
-          :month => 9,
-          :year => Time.now.year + 1,
-          :first_name => 'Longbob',
-          :last_name => 'Longsen',
-          :verification_value => '123',
-          :type => 'visa'
-        }.update(options)
-
-        CreditCard.new(defaults)
-      end
-
-      def check(options = {})
-        defaults = {
-          :name => 'Jim Smith',
-          :routing_number => '244183602', 
-          :account_number => '15378535', 
-          :account_holder_type => 'personal', 
-          :account_type => 'checking', 
-          :number => '1'
-        }.update(options)
-
-        Check.new(defaults)
-      end
-
-      def address(options = {})
-        { 
-          :name     => 'Jim Smith',
-          :address1 => '1234 My Street',
-          :address2 => 'Apt 1',
-          :company  => 'Widgets Inc',
-          :city     => 'Ottawa',
-          :state    => 'ON',
-          :zip      => 'K1C2N6',
-          :country  => 'CA',
-          :phone    => '(555)555-5555',
-          :fax      => '(555)555-6666'
-        }.update(options)
-      end
 
       def all_fixtures
         @@fixtures ||= load_fixtures
