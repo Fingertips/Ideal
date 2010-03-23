@@ -1,0 +1,12 @@
+# You can also paste the contents of the key and certificates here,
+# if you want to do so remove the “_file” part of the keys.
+ideal_ing_postbank:
+  test_url: https://idealtest.secure-ing.com:443/ideal/iDeal
+  merchant_id: ID
+  passphrase: PRIVATE KEY PASSPHRASE
+  private_key_file: |--
+    PASTE THE PATH TO YOUR PEM FILE HERE
+  private_certificate_file: |--
+    PASTE THE PATH TO YOUR CERTIFICATE FILE HERE
+  ideal_certificate_file: |--
+    PASTE THE PATH TO THE iDEAL CERTIFICATE FILE HERE

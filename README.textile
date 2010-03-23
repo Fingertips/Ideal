@@ -1,0 +1,43 @@
+h2. Active_merchant_ideal
+
+Download: http://github.com/dovadi/active_merchant_ideal or clone
+
+*  git clone git://github.com/dovadi/active_merchant_ideal.git
+
+h2. Description:
+
+iDEAL payment gateway for ActiveMerchant (see http://www.ideal.nl and http://www.activemerchant.org/).
+
+h2. History:
+
+In 2006 an iDEAL payment library was written in Ruby for a web shop build in Rails for selling mobile phone credits. It was basically a translation of the PHP example given by the iDEAL organization (see iDEAL Advanced Integration Manual PHP). Is was released as the ideal-on-rails library (see http://dev.dovadi.com/projects/ideal). 
+
+In 2007 this code was refactored as a patch for the ActiveMerchant library, this was mainly done by "Fingertips":http://www.fngtps.com/ for a client project. This patch was never accepted due to the fact it was too different (and maybe too obscure) from the 'normal' credit card gateways. 
+
+In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway (presumable based on the first ActiveMerchant patch) to a new ideal branch. 
+
+In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem.
+
+h2. Install:
+
+<pre>
+As a gem:
+
+*  sudo gem install active_merchant_ideal 
+*  Add the following to your environment.rb:
+
+config.gem 'active_merchant_ideal'
+
+As a plugin:
+
+*  ./script/plugin install git://github.com/dovadi/active_merchant_ideal.git
+</pre>
+
+h2. Test
+
+* You can run the tests from this gem with rake test.
+* For running the seven remote test transaction use rake test:remote
+
+h2. Credits
+
+This gem is maintained by "Agile Dovadi BV":http://dovadi.com, contact "Frank Oxener":mailto:frank@dovadi.com

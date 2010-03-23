@@ -5,11 +5,11 @@ begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
     gem.name = "active_merchant_ideal"
-    gem.summary = %Q{TODO: one-line summary of your gem}
-    gem.description = %Q{TODO: longer description of your gem}
+    gem.summary = %Q{iDEAL gateway for ActiveMerchant}
+    gem.description = %Q{iDEAL payment gateway for ActiveMerchant (see http://www.ideal.nl and http://www.activemerchant.org/)}
     gem.email = "frank.oxener@gmail.com"
     gem.homepage = "http://github.com/dovadi/active_merchant_ideal"
-    gem.authors = ["Frank Oxener"]
+    gem.authors = ["Soemirno Kartosoewito, Matthijs Kadijk, Aloy Duran, Frank Oxener"]
     gem.add_development_dependency "thoughtbot-shoulda", ">= 0"
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
   end
@@ -25,16 +25,12 @@ Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
 
-begin
-  require 'rcov/rcovtask'
-  Rcov::RcovTask.new do |test|
-    test.libs << 'test'
-    test.pattern = 'test/**/test_*.rb'
-    test.verbose = true
-  end
-rescue LoadError
-  task :rcov do
-    abort "RCov is not available. In order to run rcov, you must: sudo gem install spicycode-rcov"
+namespace :test do
+  desc "Run the remote tests for iDEAL gateway"
+  Rake::TestTask.new(:remote) do |t|
+    t.libs << "test"
+    t.test_files = FileList['remote_ideal_test.rb']
+    t.verbose = true
   end
 end
 
