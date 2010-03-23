@@ -2,7 +2,7 @@ h1. Active_merchant_ideal
 
 h2. Description:
 
-iDEAL payment gateway for ActiveMerchant (see http://www.ideal.nl and http://www.activemerchant.org/).
+"iDEAL":http://www.ideal.nl payment gateway for "ActiveMerchant":http://www.activemerchant.org.
 
 h2. What is iDEAL?
 
@@ -10,7 +10,7 @@ iDEAL is a set of standards developed to facilitate online payments through the 
 
 If a consumer already has online banking with ABN AMRO, Fortis, ING/Postbank, Rabobank, or SNS Bank, they can make payments using iDEAL in a way that they are already familiar with.
 
-See http://ideal.nl and http://idealdesk.com for more information.
+See "http://ideal.nl":http://ideal.nl and "http://idealdesk.com":http://idealdesk.com for more information.
 
 h2. Merchant account
 
@@ -20,11 +20,30 @@ In order to use iDEAL you will need to get an iDEAL merchant account from your b
   * ABN AMRO: iDEAL Zelfbouw
   * Fortis: ? (Unknown)
   * Rabobank: Rabo iDEAL Professional. (Unverified)
-  * SNS Bank: Not yet available. (http://www.snsbank.nl/zakelijk/betalingsverkeer/kan-ik-ideal-gebruiken-voor-mijn-webwinkel.html)
+  * SNS Bank: "Not yet available":http://www.snsbank.nl/zakelijk/betalingsverkeer/kan-ik-ideal-gebruiken-voor-mijn-webwinkel.html
 
 If you implement tests for other banks, if they require such acceptance tests, please do submit a patch or contact me directly: frank@dovadi.com.
 
-h2. Private keys and certificates
+h2. Install active_merchant_ideal:
+
+As a gem:
+
+<pre>
+sudo gem install active_merchant_ideal 
+</pre>
+
+Add the following to your environment.rb:
+
+<pre>
+config.gem 'active_merchant_ideal'
+</pre>
+
+As a plugin:
+<pre>
+./script/plugin install git://github.com/dovadi/active_merchant_ideal.git
+</pre>
+
+h2. Generate private keys and certificates
 
 Messages to, and from, the acquirer, are all signed in order to prove their authenticity. This means that you will have to have a certificate to sign your messages going to the acquirer _and_ you will need to have the certificate of the acquirer to verify its signed messages.
 
@@ -32,14 +51,37 @@ The latter can be downloaded from your acquirer after registration. The former, 
 
 To create a self-signed certificate follow these steps:
 
-$ /usr/bin/openssl genrsa -des3 -out private_key.pem -passout pass:the_passphrase 1024
-$ /usr/bin/openssl req -x509 -new -key private_key.pem -passin pass:the_passphrase -days 3650 -out private_certificate.cer
+* /usr/bin/openssl genrsa -des3 -out private_key.pem -passout pass:the_passphrase 1024
+* /usr/bin/openssl req -x509 -new -key private_key.pem -passin pass:the_passphrase -days 3650 -out private_certificate.cer
 
-Substitute <tt>the_passphrase</tt> with your own passphrase.
+Substitute _the_passphrase__ with your own passphrase.
+
+With the ING bank you upload your private certificate with your iDEAL Dashboard. Be aware that there are two dashboards, one "dashboard":https://idealtest.secure-ing.com/ideal/logon_ing.do for the test environment and one "dashboard":https://ideal.secure-ing.com/ideal/logon_ing.do for the production environment!
 
 For more information see:
-* http://en.wikipedia.org/wiki/Certificate_authority
-* http://en.wikipedia.org/wiki/Self-signed_certificate
+* "http://en.wikipedia.org/wiki/Certificate_authority":http://en.wikipedia.org/wiki/Certificate_authority
+* "http://en.wikipedia.org/wiki/Self-signed_certificate":http://en.wikipedia.org/wiki/Self-signed_certificate
+
+h2. Test
+
+h3. Test the gem
+
+You can run the tests from this gem with (inside the active_merchant_ideal directory):
+
+<pre>
+rake test
+</pre>
+
+h3. Run the remote tests
+
+* Create .active_merchant directory in your own home directory
+* Copy test/fixtures.yml to the .active_merchant directory
+* Fill in your own merchant id, passphrase and the correct locations to your private key and certificates.
+* For running the *seven prescribed remote test transactions* (ING bank) which are needed to activate the iDEAL account use 
+
+<pre>
+rake test:remote
+</pre>
 
 h2. Example (Rails)
 
@@ -47,41 +89,31 @@ h3. First configure the gateway
 
 Put the following code in, for instance, an initializer:
 
-<code>
+<pre>
 IdealGateway.live_url = 'https://ideal.secure-ing.com:443/ideal/iDeal'
-
 IdealGateway.merchant_id = '00123456789'
-
-# CERTIFICATE_ROOT points to a directory where the key and certificates are located.
 IdealGateway.passphrase = 'the_private_key_passphrase'
+
+# CERTIFICATE_ROOT points to a directory where the key and certificates are located
 IdealGateway.private_key_file = File.join(CERTIFICATE_ROOT, 'private_key.pem')
 IdealGateway.private_certificate_file = File.join(CERTIFICATE_ROOT, 'private_certificate.cer')
 IdealGateway.ideal_certificate_file = File.join(CERTIFICATE_ROOT, 'ideal.cer')
-</code>
+</pre>
 
 h3. View
 
 Give the consumer a list of available issuer options:
 
-<code>
-     gateway = ActiveMerchant::Billing::IdealGateway.new
-     issuers = gateway.issuers.list
-     sorted_issuers = issuers.sort_by { |issuer| issuer[:name] }
-     select('purchase', 'issuer_id', issuers.map { |issuer| [issuer[:name], issuer[:id]] })
-</code>
+<pre>
+gateway = ActiveMerchant::Billing::IdealGateway.new
+issuers = gateway.issuers.list
+sorted_issuers = issuers.sort_by { |issuer| issuer[:name] }
+select('purchase', 'issuer_id', issuers.map { |issuer| [issuer[:name], issuer[:id]] })
+</pre>
 
 Could become:
 
-<code>
-   <select name="purchase[issuer_id]">
-     <option value="1006" selected="selected">ABN AMRO Bank</option>
-     <option value="1017">Asr bank</option>
-     <option value="1003">Postbank</option>
-     <option value="1005">Rabobank</option>
-     <option value="1023">Van Lanschot</option>
-   </select>
-</code>
-
+<pre>
 <select name="purchase[issuer_id]">
   <option value="1006" selected="selected">ABN AMRO Bank</option>
   <option value="1017">Asr bank</option>
@@ -89,12 +121,13 @@ Could become:
   <option value="1005">Rabobank</option>
   <option value="1023">Van Lanschot</option>
 </select>
+</pre>
 
 h3. Controller
 
 First you'll need to setup a transaction and redirect the consumer there so she can make the payment:
 
-<code>
+<pre>
  class PurchasesController < ActionController::Base
    def create
      purchase = @user.purchases.build(:price => 1000) # €10.00 in cents.
@@ -122,11 +155,11 @@ First you'll need to setup a transaction and redirect the consumer there so she 
      end
    end
  end
-</code>
+</pre>
 
-After the consumer is done with the payment she will be redirected to the <tt>:return_url</tt>. It's now _your_ responsibility as merchant to check if the payment has been made:
+After the consumer is done with the payment she will be redirected to the _:return_url_. It's now _your_ responsibility as merchant to check if the payment has been made:
 
-<code>
+<pre>
  class PurchasesController < ActionController::Base
    def show
      gateway = ActiveMerchant::Billing::IdealGateway.new
@@ -138,41 +171,17 @@ After the consumer is done with the payment she will be redirected to the <tt>:r
      end
    end
  end
-</code>
+</pre>
 
-h2. History:
+h2. History
 
-In 2006 an iDEAL payment library was written in Ruby for a web shop build in Rails for selling mobile phone credits. It was basically a translation of the PHP example given by the iDEAL organization (see iDEAL Advanced Integration Manual PHP). Is was released as the ideal-on-rails library (see http://dev.dovadi.com/projects/ideal). 
+In 2006 an iDEAL payment library was written in Ruby for a web shop build in Rails for selling mobile phone credits. It was basically a translation of the PHP example given by the iDEAL organization (see iDEAL Advanced Integration Manual PHP). Is was released as the ideal-on-rails library (see "http://dev.dovadi.com/projects/ideal":http://dev.dovadi.com/projects/ideal). 
 
 In 2007 this code was refactored as a patch for the ActiveMerchant library, this was mainly done by "Fingertips":http://www.fngtps.com/ for a client project. This patch was never accepted due to the fact it was too different (and maybe too obscure) from the 'normal' credit card gateways. 
 
 In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway (presumable based on the first ActiveMerchant patch) to a new ideal branch. 
 
 In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem.
-
-h2. Install:
-
-As a gem:
-
-<pre>
-sudo gem install active_merchant_ideal 
-</pre>
-
-Add the following to your environment.rb:
-
-<code>
-config.gem 'active_merchant_ideal'
-</code>
-
-As a plugin:
-<pre>
-./script/plugin install git://github.com/dovadi/active_merchant_ideal.git
-</pre>
-
-h2. Test
-
-* You can run the tests from this gem with rake test.
-* For running the seven remote test transaction use rake test:remote
 
 h2. Maintainer
 
