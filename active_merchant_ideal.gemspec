@@ -23,6 +23,7 @@ Gem::Specification.new do |s|
      "README.textile",
      "Rakefile",
      "VERSION",
+     "active_merchant_ideal.gemspec",
      "init.rb",
      "lib/active_merchant_ideal.rb",
      "lib/active_merchant_ideal/ideal.rb",
@@ -48,12 +49,15 @@ Gem::Specification.new do |s|
     s.specification_version = 3
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
-      s.add_development_dependency(%q<thoughtbot-shoulda>, [">= 0"])
+      s.add_runtime_dependency(%q<active_merchant>, [">= 1.5.1"])
+      s.add_development_dependency(%q<mocha>, [">= 0.9.7"])
     else
-      s.add_dependency(%q<thoughtbot-shoulda>, [">= 0"])
+      s.add_dependency(%q<active_merchant>, [">= 1.5.1"])
+      s.add_dependency(%q<mocha>, [">= 0.9.7"])
     end
   else
-    s.add_dependency(%q<thoughtbot-shoulda>, [">= 0"])
+    s.add_dependency(%q<active_merchant>, [">= 1.5.1"])
+    s.add_dependency(%q<mocha>, [">= 0.9.7"])
   end
 end
 
