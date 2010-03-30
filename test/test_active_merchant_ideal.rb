@@ -429,7 +429,7 @@ module IdealTestCases
     end
 
     def test_setup_purchase_returns_response_with_service_url
-      assert_equal 'https://ideal.example.com/long_service_url', @setup_purchase_response.service_url
+      assert_equal 'https://ideal.example.com/long_service_url?X009=BETAAL&X010=20', @setup_purchase_response.service_url
     end
 
     def test_setup_purchase_returns_response_with_transaction_and_order_ids
@@ -622,7 +622,7 @@ ilZjTJIlLOkXk6uE8vQGjZy0BUnjNPkXOQGkTyj4jDxZ2z+z9Vy8BwfothdcYbZK
     <acquirerID>1545</acquirerID>
   </Acquirer>
   <Issuer>
-    <issuerAuthenticationURL>https://ideal.example.com/long_service_url</issuerAuthenticationURL>
+    <issuerAuthenticationURL>https://ideal.example.com/long_service_url?X009=BETAAL&amp;X010=20</issuerAuthenticationURL>
   </Issuer>
   <Transaction>
      <transactionID>0001023456789112</transactionID>

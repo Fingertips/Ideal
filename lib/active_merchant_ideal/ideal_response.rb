@@ -140,7 +140,7 @@ module ActiveMerchant #:nodoc:
       # Returns the URL to the issuer’s page where the consumer should be
       # redirected to in order to perform the payment.
       def service_url
-        text('//issuerAuthenticationURL')
+        CGI::unescapeHTML(text('//issuerAuthenticationURL'))
       end
 
       # Returns the transaction ID which is needed for requesting the status
