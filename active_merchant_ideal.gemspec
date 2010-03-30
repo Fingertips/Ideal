@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{active_merchant_ideal}
-  s.version = "0.1.1"
+  s.version = "0.1.3"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Soemirno Kartosoewito, Matthijs Kadijk, Aloy Duran, Frank Oxener"]
-  s.date = %q{2010-03-23}
+  s.date = %q{2010-03-30}
   s.description = %q{iDEAL payment gateway for ActiveMerchant (see http://www.ideal.nl and http://www.activemerchant.org/)}
   s.email = %q{frank.oxener@gmail.com}
   s.extra_rdoc_files = [
