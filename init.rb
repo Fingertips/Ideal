@@ -1,1 +1,1 @@
-require 'active_mechant_ideal'
+require 'active_merchant_ideal'
