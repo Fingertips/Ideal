@@ -90,7 +90,10 @@ h3. First configure the gateway
 Put the following code in, for instance, an initializer:
 
 <pre>
+IdealGateway.acquirer = :ing # Other banks preloaded are :abnamro and :rabobank
+# OR
 IdealGateway.live_url = 'https://ideal.secure-ing.com:443/ideal/iDeal'
+
 IdealGateway.merchant_id = '00123456789'
 IdealGateway.passphrase = 'the_private_key_passphrase'
 

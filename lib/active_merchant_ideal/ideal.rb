@@ -19,6 +19,29 @@ module ActiveMerchant #:nodoc:
       CURRENCY = 'EUR'
       API_VERSION = '1.1.0'
       XML_NAMESPACE = 'http://www.idealdesk.com/Message'
+      
+      ACQUIRERS = {
+        :abnamro => {
+          :test => {
+            :directory => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Directory.aspx",
+            :transaction => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Transaction.aspx",
+            :status => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Status.aspx"
+            },
+            :live => {
+              :directory => "https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml",
+              :transaction => "https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml",
+              :status => "https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml"
+            }
+          },
+          :rabobank => {
+            :test => "https://idealtest.rabobank.nl/ideal/iDeal",
+            :live => "https://ideal.rabobank.nl/ideal/iDeal"
+          },
+          :ing => {
+            :test => "https://idealtest.secure-ing.com/ideal/iDeal",
+            :live => "https://ideal.secure-ing.com/ideal/iDeal"
+          }
+        }
 
       # Assigns the global iDEAL merchant id. Make sure to use a string with
       # leading zeroes if needed.
@@ -75,13 +98,50 @@ module ActiveMerchant #:nodoc:
         @ideal_certificate
       end
 
+      # Set the acquirer url based on known info
+      # Currently supported arguments: :ing, :rabobank, :abnamro
+      def self.acquirer=(acquirer)
+        if acquire.is_a?(Symbol) && ACQUIRERS.include?(acquirer)
+          if ACQUIRERS[acquirer][:live].respond_to?(:join)
+            # probably ABN
+            self.live_directory_url   = ACQUIRERS[acquirer][:live][:directory]
+            self.live_transaction_url = ACQUIRERS[acquirer][:live][:transaction]
+            self.live_status_url      = ACQUIRERS[acquirer][:live][:status]
+          else
+            self.live_url             = ACQUIRERS[acquirer][:live]
+          end
+          if ACQUIRERS[acquirer][:test].respond_to?(:join)
+            # probably ABN
+            self.test_directory_url   = ACQUIRERS[acquirer][:test][:directory]
+            self.test_transaction_url = ACQUIRERS[acquirer][:test][:transaction]
+            self.test_status_url      = ACQUIRERS[acquirer][:test][:status]
+          else
+            self.test_url             = ACQUIRERS[acquirer][:test]
+          end
+        end
+      end
+
       # Assign the test and production urls for your iDeal acquirer.
       #
       # For instance, for ING:
       #
       #   ActiveMerchant::Billing::IdealGateway.test_url = "https://idealtest.secure-ing.com:443/ideal/iDeal"
       #   ActiveMerchant::Billing::IdealGateway.live_url = "https://ideal.secure-ing.com:443/ideal/iDeal"
-      cattr_accessor :test_url, :live_url
+      def self.test_url=(url)
+        @@test_url = self.test_directory_url = self.test_transaction_url = self.test_status_url = url
+      end
+      def self.test_url
+        @@test_url
+      end
+      def self.live_url=(url)
+        @@live_url = self.live_directory_url = self.live_transaction_url = self.live_status_url = url
+      end
+      def self.live_url
+        @@live_url
+      end
+      cattr_accessor :test_directory_url, :live_directory_url
+      cattr_accessor :test_transaction_url, :live_transaction_url
+      cattr_accessor :test_status_url, :live_status_url
 
       # Returns the merchant `subID' being used for this IdealGateway instance.
       # Defaults to 0.
@@ -99,8 +159,17 @@ module ActiveMerchant #:nodoc:
       #
       # When #test? returns +true+ the IdealGateway.test_url is used, otherwise
       # the IdealGateway.live_url is used.
-      def acquirer_url
-        test? ? self.class.test_url : self.class.live_url
+      def acquirer_url(request_type)
+        case request_type
+        when :directory
+          test? ? self.class.test_directory_url : self.class.live_directory_url
+        when :transaction
+          test? ? self.class.test_transaction_url : self.class.live_transaction_url
+        when :status
+          test? ? self.class.test_status_url : self.class.live_status_url
+        else
+          test? ? self.class.test_url : self.class.live_url
+        end
       end
 
       # Sends a directory request to the acquirer and returns an
@@ -109,7 +178,7 @@ module ActiveMerchant #:nodoc:
       #
       #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
       def issuers
-        post_data build_directory_request_body, IdealDirectoryResponse
+        post_data acquirer_url(:directory), build_directory_request_body, IdealDirectoryResponse
       end
 
       # Starts a purchase by sending an acquirer transaction request for the
@@ -157,7 +226,7 @@ module ActiveMerchant #:nodoc:
       #
       # See the IdealGateway class description for a more elaborate example.
       def setup_purchase(money, options)
-        post_data build_transaction_request_body(money, options), IdealTransactionResponse
+        post_data acquirer_url(:transaction), build_transaction_request_body(money, options), IdealTransactionResponse
       end
 
       # Sends a acquirer status request for the specified +transaction_id+ and
@@ -177,13 +246,13 @@ module ActiveMerchant #:nodoc:
       #
       # See the IdealGateway class description for a more elaborate example.
       def capture(transaction_id)
-        post_data build_status_request_body(:transaction_id => transaction_id), IdealStatusResponse
+        post_data acquirer_url(:status), build_status_request_body(:transaction_id => transaction_id), IdealStatusResponse
       end
 
       private
 
-      def post_data(data, response_klass)
-        response_klass.new(ssl_post(acquirer_url, data), :test => test?)
+      def post_data(gateway_url, data, response_klass)
+        response_klass.new(ssl_post(gateway_url, data), :test => test?)
       end
 
       # This is the list of charaters that are not supported by iDEAL according
