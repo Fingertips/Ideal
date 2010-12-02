@@ -91,9 +91,6 @@ Put the following code in, for instance, an initializer:
 
 <pre>
 IdealGateway.acquirer = :ing # Other banks preloaded are :abnamro and :rabobank
-# OR
-IdealGateway.live_url = 'https://ideal.secure-ing.com:443/ideal/iDeal'
-
 IdealGateway.merchant_id = '00123456789'
 IdealGateway.passphrase = 'the_private_key_passphrase'
 
@@ -184,7 +181,7 @@ In 2007 this code was refactored as a patch for the ActiveMerchant library, this
 
 In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway (presumable based on the first ActiveMerchant patch) to a new ideal branch. 
 
-In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem.
+In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem. Later that year "Sernin van de Krol":http://github/companeidos added support for ABN AMRO.
 
 h2. Maintainer
 
