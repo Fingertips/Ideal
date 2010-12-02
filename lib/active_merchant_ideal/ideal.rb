@@ -31,15 +31,18 @@ module ActiveMerchant #:nodoc:
               :directory => "https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml",
               :transaction => "https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml",
               :status => "https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml"
-            }
+            },
+            :whitespace_behaviour => :abn
           },
           :rabobank => {
             :test => "https://idealtest.rabobank.nl/ideal/iDeal",
-            :live => "https://ideal.rabobank.nl/ideal/iDeal"
+            :live => "https://ideal.rabobank.nl/ideal/iDeal",
+            :whitespace_behaviour => :normal
           },
           :ing => {
             :test => "https://idealtest.secure-ing.com/ideal/iDeal",
-            :live => "https://ideal.secure-ing.com/ideal/iDeal"
+            :live => "https://ideal.secure-ing.com/ideal/iDeal",
+            :whitespace_behaviour => :normal
           }
         }
 
@@ -49,6 +52,9 @@ module ActiveMerchant #:nodoc:
 
       # Assigns the passphrase that should be used for the merchant private_key.
       cattr_accessor :passphrase
+      
+      # Defines the whitespace behaviour, this is different for ABN AMRO. Possible values: :abn, :normal
+      cattr_accessor :whitespace_behaviour
 
       # Loads the global merchant private_key from disk.
       def self.private_key_file=(pkey_file)
@@ -118,6 +124,7 @@ module ActiveMerchant #:nodoc:
           else
             self.test_url             = ACQUIRERS[acquirer][:test]
           end
+          self.whitespace_behaviour = ACQUIRERS[acquirer][:whitespace_behaviour]
         end
       end
 
@@ -273,11 +280,22 @@ module ActiveMerchant #:nodoc:
       def token
         Digest::SHA1.hexdigest(self.class.private_certificate.to_der).upcase
       end
+      
+      def strip_whitespace(str)
+        case self.class.whitespace_behaviour
+        when :abn
+          str.gsub(/(\f|\n|\r|\t|\v)/m, '')
+        when :normal
+          str.gsub(/\s/m,'')
+        else
+          str.gsub(/\s/m,'')
+        end
+      end
 
       # Creates a +tokenCode+ from the specified +message+.
       def token_code(message)
-        signature = self.class.private_key.sign(OpenSSL::Digest::SHA1.new, message.gsub(/\s/m, ''))
-        Base64.encode64(signature).gsub(/\s/m, '')
+        signature = self.class.private_key.sign(OpenSSL::Digest::SHA1.new, strip_whitespace(message))
+        strip_whitespace(Base64.encode64(signature))
       end
 
       # Returns a string containing the current UTC time, formatted as per the

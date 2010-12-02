@@ -116,6 +116,7 @@ module IdealTestCases
     end
 
     def test_token_code_generation
+      IdealGateway.whitespace_behaviour = :normal
       message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
       stripped_message = message.gsub(/\s/m, '')
 
@@ -127,6 +128,21 @@ module IdealTestCases
 
       assert_equal encoded_signature, @gateway.send(:token_code, message)
     end
+    def test_token_code_generation_on_abn_amro
+      IdealGateway.whitespace_behaviour = :abn
+      message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
+      stripped_message = message.gsub(/(\f|\n|\r|\t|\v)/m, '')
+
+      sha1 = OpenSSL::Digest::SHA1.new
+      OpenSSL::Digest::SHA1.stubs(:new).returns(sha1)
+
+      signature = IdealGateway.private_key.sign(sha1, stripped_message)
+      encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
+
+      assert_equal encoded_signature, @gateway.send(:token_code, message)
+      IdealGateway.whitespace_behaviour = :normal
+    end
+
 
     def test_posts_data_with_ssl_to_acquirer_url_and_return_the_correct_response
       IdealResponse.expects(:new).with('response', :test => true)
