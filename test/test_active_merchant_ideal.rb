@@ -63,12 +63,16 @@ module IdealTestCases
 
     def test_returns_the_test_url_when_in_the_test_env
       @gateway.stubs(:test?).returns(true)
-      assert_equal IdealGateway.test_url, @gateway.send(:acquirer_url)
+      assert_equal IdealGateway.test_directory_url,   @gateway.send(:acquirer_url,:directory)
+      assert_equal IdealGateway.test_transaction_url, @gateway.send(:acquirer_url,:transaction)
+      assert_equal IdealGateway.test_status_url,      @gateway.send(:acquirer_url,:status)
     end
 
     def test_returns_the_live_url_when_not_in_the_test_env
       @gateway.stubs(:test?).returns(false)
-      assert_equal IdealGateway.live_url, @gateway.send(:acquirer_url)
+      assert_equal IdealGateway.live_directory_url,   @gateway.send(:acquirer_url,:directory)
+      assert_equal IdealGateway.live_transaction_url, @gateway.send(:acquirer_url,:transaction)
+      assert_equal IdealGateway.live_status_url,      @gateway.send(:acquirer_url,:status)
     end
 
     def test_returns_created_at_timestamp
@@ -126,13 +130,13 @@ module IdealTestCases
 
     def test_posts_data_with_ssl_to_acquirer_url_and_return_the_correct_response
       IdealResponse.expects(:new).with('response', :test => true)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'data').returns('response')
-      @gateway.send(:post_data, 'data', IdealResponse)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'data').returns('response')
+      @gateway.send(:post_data, @gateway.acquirer_url(:directory), 'data', IdealResponse)
 
       @gateway.stubs(:test?).returns(false)
       IdealResponse.expects(:new).with('response', :test => false)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'data').returns('response')
-      @gateway.send(:post_data, 'data', IdealResponse)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'data').returns('response')
+      @gateway.send(:post_data, @gateway.acquirer_url(:directory), 'data', IdealResponse)
     end
   end
 
@@ -387,7 +391,7 @@ module IdealTestCases
 
     def test_returns_a_list_with_only_one_issuer
       @gateway.stubs(:build_directory_request_body).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'the request body').returns(DIRECTORY_RESPONSE_WITH_ONE_ISSUER)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_ONE_ISSUER)
 
       expected_issuers = [{ :id => '1006', :name => 'ABN AMRO Bank' }]
 
@@ -398,7 +402,7 @@ module IdealTestCases
 
     def test_returns_list_of_issuers_from_response
       @gateway.stubs(:build_directory_request_body).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'the request body').returns(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
 
       expected_issuers = [
         { :id => '1006', :name => 'ABN AMRO Bank' },
@@ -419,7 +423,7 @@ module IdealTestCases
       @gateway = IdealGateway.new
 
       @gateway.stubs(:build_transaction_request_body).with(4321, VALID_PURCHASE_OPTIONS).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'the request body').returns(ACQUIRER_TRANSACTION_RESPONSE)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:transaction), 'the request body').returns(ACQUIRER_TRANSACTION_RESPONSE)
 
       @setup_purchase_response = @gateway.setup_purchase(4321, VALID_PURCHASE_OPTIONS)
     end
@@ -494,7 +498,7 @@ module IdealTestCases
     private
 
     def expects_request_and_returns(str)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url, 'the request body').returns(str)
+      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:status), 'the request body').returns(str)
     end
   end
 
