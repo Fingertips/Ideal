@@ -19,32 +19,11 @@ module ActiveMerchant #:nodoc:
       CURRENCY = 'EUR'
       API_VERSION = '1.1.0'
       XML_NAMESPACE = 'http://www.idealdesk.com/Message'
-      
-      ACQUIRERS = {
-        :abnamro => {
-          :test => {
-            :directory => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Directory.aspx",
-            :transaction => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Transaction.aspx",
-            :status => "https://itt.idealdesk.com/ITTEmulatorAcquirer/Status.aspx"
-            },
-            :live => {
-              :directory => "https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml",
-              :transaction => "https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml",
-              :status => "https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml"
-            },
-            :whitespace_behaviour => :abn
-          },
-          :rabobank => {
-            :test => "https://idealtest.rabobank.nl/ideal/iDeal",
-            :live => "https://ideal.rabobank.nl/ideal/iDeal",
-            :whitespace_behaviour => :normal
-          },
-          :ing => {
-            :test => "https://idealtest.secure-ing.com/ideal/iDeal",
-            :live => "https://ideal.secure-ing.com/ideal/iDeal",
-            :whitespace_behaviour => :normal
-          }
-        }
+
+      def self.acquirers
+        config_file = File.dirname(__FILE__) + '/acquirers.yml'
+        File.exists?(config_file) ? YAML.load(File.read(config_file)) : {}
+      end
 
       # Assigns the global iDEAL merchant id. Make sure to use a string with
       # leading zeroes if needed.
@@ -92,63 +71,39 @@ module ActiveMerchant #:nodoc:
       def self.ideal_certificate_file=(certificate_file)
         self.ideal_certificate = File.read(certificate_file)
       end
-      
+
       # Instantiates and assings a OpenSSL::X509::Certificate instance with the
       # provided iDEAL certificate data.
       def self.ideal_certificate=(certificate_data)
         @ideal_certificate = OpenSSL::X509::Certificate.new(certificate_data)
       end
-      
+
       # Returns the global merchant ideal_certificate.
       def self.ideal_certificate
         @ideal_certificate
       end
 
-      # Set the acquirer url based on known info
+      # Assign the test and production urls for your iDeal acquirer.
+      # For ABN AMRO only assign the three separate directory, transaction and status urls.
+      cattr_accessor :live_url,             :test_url
+      cattr_accessor :live_directory_url,   :test_directory_url
+      cattr_accessor :live_transaction_url, :test_transaction_url
+      cattr_accessor :live_status_url,      :test_status_url
+
+      # Set the correct acquirer url based on the specific Bank
       # Currently supported arguments: :ing, :rabobank, :abnamro
       def self.acquirer=(acquirer)
-        if acquire.is_a?(Symbol) && ACQUIRERS.include?(acquirer)
-          if ACQUIRERS[acquirer][:live].respond_to?(:join)
-            # probably ABN
-            self.live_directory_url   = ACQUIRERS[acquirer][:live][:directory]
-            self.live_transaction_url = ACQUIRERS[acquirer][:live][:transaction]
-            self.live_status_url      = ACQUIRERS[acquirer][:live][:status]
+        acquirer = acquirer.to_s
+        if self.acquirers.include?(acquirer)
+          if self.acquirers[acquirer]['live'].is_a?(Hash) #Assume acquirer is abnamro
+            self.acquirers[acquirer].each{|env, url| url.each{|sort,value| self.send("#{env}_#{sort}_url=",value)}}
+            self.whitespace_behaviour = :abnamro
           else
-            self.live_url             = ACQUIRERS[acquirer][:live]
+            self.live_url = self.acquirers[acquirer]['live']
+            self.test_url = self.acquirers[acquirer]['test']
           end
-          if ACQUIRERS[acquirer][:test].respond_to?(:join)
-            # probably ABN
-            self.test_directory_url   = ACQUIRERS[acquirer][:test][:directory]
-            self.test_transaction_url = ACQUIRERS[acquirer][:test][:transaction]
-            self.test_status_url      = ACQUIRERS[acquirer][:test][:status]
-          else
-            self.test_url             = ACQUIRERS[acquirer][:test]
-          end
-          self.whitespace_behaviour = ACQUIRERS[acquirer][:whitespace_behaviour]
         end
       end
-
-      # Assign the test and production urls for your iDeal acquirer.
-      #
-      # For instance, for ING:
-      #
-      #   ActiveMerchant::Billing::IdealGateway.test_url = "https://idealtest.secure-ing.com:443/ideal/iDeal"
-      #   ActiveMerchant::Billing::IdealGateway.live_url = "https://ideal.secure-ing.com:443/ideal/iDeal"
-      def self.test_url=(url)
-        @@test_url = self.test_directory_url = self.test_transaction_url = self.test_status_url = url
-      end
-      def self.test_url
-        @@test_url
-      end
-      def self.live_url=(url)
-        @@live_url = self.live_directory_url = self.live_transaction_url = self.live_status_url = url
-      end
-      def self.live_url
-        @@live_url
-      end
-      cattr_accessor :test_directory_url, :live_directory_url
-      cattr_accessor :test_transaction_url, :live_transaction_url
-      cattr_accessor :test_status_url, :live_status_url
 
       # Returns the merchant `subID' being used for this IdealGateway instance.
       # Defaults to 0.
@@ -167,16 +122,7 @@ module ActiveMerchant #:nodoc:
       # When #test? returns +true+ the IdealGateway.test_url is used, otherwise
       # the IdealGateway.live_url is used.
       def acquirer_url(request_type)
-        case request_type
-        when :directory
-          test? ? self.class.test_directory_url : self.class.live_directory_url
-        when :transaction
-          test? ? self.class.test_transaction_url : self.class.live_transaction_url
-        when :status
-          test? ? self.class.test_status_url : self.class.live_status_url
-        else
-          test? ? self.class.test_url : self.class.live_url
-        end
+        self.class.send("#{test_or_live}#{sort_request(request_type)}_url")
       end
 
       # Sends a directory request to the acquirer and returns an
@@ -258,6 +204,20 @@ module ActiveMerchant #:nodoc:
 
       private
 
+      def abnamro?
+        self.class.whitespace_behaviour == :abnamro
+      end
+
+      # Set correct mode for acquirer_url
+      def test_or_live
+        test? ? 'test' : 'live'
+      end
+
+      # Determine type of request used by ABN AMRO
+      def sort_request(request_type)
+        request_type && abnamro? ? "_#{request_type.to_s}" : nil
+      end
+
       def post_data(gateway_url, data, response_klass)
         response_klass.new(ssl_post(gateway_url, data), :test => test?)
       end
@@ -280,16 +240,9 @@ module ActiveMerchant #:nodoc:
       def token
         Digest::SHA1.hexdigest(self.class.private_certificate.to_der).upcase
       end
-      
+
       def strip_whitespace(str)
-        case self.class.whitespace_behaviour
-        when :abn
-          str.gsub(/(\f|\n|\r|\t|\v)/m, '')
-        when :normal
-          str.gsub(/\s/m,'')
-        else
-          str.gsub(/\s/m,'')
-        end
+        abnamro? ? str.gsub(/(\f|\n|\r|\t|\v)/m, '') : str.gsub(/\s/m,'')
       end
 
       # Creates a +tokenCode+ from the specified +message+.

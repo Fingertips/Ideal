@@ -10,9 +10,7 @@ module IdealTestCases
       self.private_key = PRIVATE_KEY
       self.private_certificate = PRIVATE_CERTIFICATE
       self.ideal_certificate = IDEAL_CERTIFICATE
-
-      self.test_url = "https://idealtest.example.com:443/ideal/iDeal"
-      self.live_url = "https://ideal.example.com:443/ideal/iDeal"
+      self.acquirer = :ing
     end
   end
 
@@ -25,14 +23,32 @@ module IdealTestCases
     :entrance_code     => '1234'
   }
 
-  ###
-  #
-  # Actual test cases
-  #
-
   class ClassMethodsTest < Test::Unit::TestCase
     def test_merchant_id
       assert_equal IdealGateway.merchant_id, '123456789'
+    end
+
+    def test_verify_live_url_for_ing
+      ActiveMerchant::Billing::IdealGateway.acquirer = :ing
+      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', IdealGateway.live_url
+    end
+
+    def test_verify_live_url_for_rabobank
+      ActiveMerchant::Billing::IdealGateway.acquirer = :rabobank
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', IdealGateway.live_url
+    end
+
+    def test_verify_live_urls_for_abnamro
+      ActiveMerchant::Billing::IdealGateway.acquirer = :abnamro
+      assert_equal 'https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml', IdealGateway.live_directory_url
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', IdealGateway.live_transaction_url
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml', IdealGateway.live_status_url
+    end
+
+    def test_acquirers
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', IdealGateway.acquirers['rabobank']['live']
+      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', IdealGateway.acquirers['ing']['live']
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', IdealGateway.acquirers['abnamro']['live']['transaction']
     end
 
     def test_private_certificate_returns_a_loaded_Certificate_instance
@@ -116,7 +132,7 @@ module IdealTestCases
     end
 
     def test_token_code_generation
-      IdealGateway.whitespace_behaviour = :normal
+      IdealGateway.whitespace_behaviour = nil
       message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
       stripped_message = message.gsub(/\s/m, '')
 
@@ -128,9 +144,10 @@ module IdealTestCases
 
       assert_equal encoded_signature, @gateway.send(:token_code, message)
     end
+
     def test_token_code_generation_on_abn_amro
-      IdealGateway.whitespace_behaviour = :abn
-      message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
+      IdealGateway.whitespace_behaviour = :abnamro
+      message = "Top\tsecret\tman.\nI could tell you, but\r then I'd have to kill you…"
       stripped_message = message.gsub(/(\f|\n|\r|\t|\v)/m, '')
 
       sha1 = OpenSSL::Digest::SHA1.new
@@ -140,9 +157,7 @@ module IdealTestCases
       encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
 
       assert_equal encoded_signature, @gateway.send(:token_code, message)
-      IdealGateway.whitespace_behaviour = :normal
     end
-
 
     def test_posts_data_with_ssl_to_acquirer_url_and_return_the_correct_response
       IdealResponse.expects(:new).with('response', :test => true)

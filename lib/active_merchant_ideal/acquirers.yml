@@ -1,0 +1,18 @@
+ing:
+  live: https://ideal.secure-ing.com/ideal/iDeal
+  test: https://idealtest.secure-ing.com/ideal/iDeal
+
+rabobank:
+  live: https://ideal.rabobank.nl/ideal/iDeal
+  test: https://idealtest.rabobank.nl/ideal/iDeal
+
+abnamro:
+  live:
+    directory: https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml
+    transaction: https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml
+    status: https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml
+
+  test:
+    directory: https://itt.idealdesk.com/ITTEmulatorAcquirer/Directory.aspx
+    transaction: https://itt.idealdesk.com/ITTEmulatorAcquirer/Transaction.aspx
+    status: https://itt.idealdesk.com/ITTEmulatorAcquirer/Status.aspx
