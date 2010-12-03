@@ -1,3 +1,6 @@
+#!ruby19
+# encoding: utf-8
+
 require 'openssl'
 require 'base64'
 require 'rexml/document'

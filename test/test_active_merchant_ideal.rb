@@ -1,4 +1,7 @@
-require File.dirname(__FILE__) + '/helper'
+#!ruby19
+# encoding: utf-8
+
+require File.expand_path(File.dirname(__FILE__))  + '/helper'
 
 module IdealTestCases
   # This method is called at the end of the file when all fixture data has been loaded.
