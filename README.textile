@@ -72,7 +72,7 @@ You can run the tests from this gem with (inside the active_merchant_ideal direc
 rake test
 </pre>
 
-h3. Run the remote tests
+h3. Run the remote tests (For ING BANK only)
 
 * Create .active_merchant directory in your own home directory
 * Copy test/fixtures.yml to the .active_merchant directory
@@ -82,6 +82,10 @@ h3. Run the remote tests
 <pre>
 rake test:remote
 </pre>
+
+h3. Compatibility
+
+Active_merchant_ideal is tested with Ruby 1.8.7 and 1.9.2.
 
 h2. Example (Rails)
 
@@ -181,7 +185,7 @@ In 2007 this code was refactored as a patch for the ActiveMerchant library, this
 
 In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway (presumable based on the first ActiveMerchant patch) to a new ideal branch. 
 
-In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem. Later that year "Sernin van de Krol":http://github/companeidos added support for ABN AMRO.
+In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem. Later that year "Sernin van de Krol":http://github/companeidos added support for ABN AMRO. 
 
 h2. Maintainer
 
