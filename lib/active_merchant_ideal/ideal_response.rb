@@ -178,7 +178,8 @@ module ActiveMerchant #:nodoc:
       # <tt>:cancelled</tt>, <tt>:expired</tt>, <tt>:open</tt>, or
       # <tt>:failure</tt>.
       def status
-        text('//status').downcase.to_sym
+        status = text('//status')
+        status.downcase.to_sym unless status.blank?
       end
 
       # Returns whether or not the authenticity of the message could be
