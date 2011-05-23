@@ -5,7 +5,7 @@ h2. ATTENTION: transition period with a new certificate (ING only)
 Recently ING issued a new iDEAL certificate, which should be in production before May 23 2011. See "Wijzigen van een acquiring certificaat in
 iDEAL Advanced":http://www.ing.nl/Images/Wijzigen_van_een_acquiring_certificaat_in_iDEAL_Advanced_internet_tcm7-82882.pdf. However ING is not able to say exactly when this migration will take place. This means there will be a transition period in which it's uncertain which iDEAL certificate is needed.
 
-Luckily Rob van Dijk (Voormedia BV) has written a gem/patch, so you can use the old and the new certificate during this transition period.
+Luckily Roel van Dijk (Voormedia BV) has written a gem/patch, so you can use the old and the new certificate during this transition period.
 
 See "active_merchant_ideal_multicert":https://github.com/rdvdijk/active_merchant_ideal_multicert
 
