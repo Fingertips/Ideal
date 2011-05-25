@@ -103,14 +103,14 @@ h3. First configure the gateway
 Put the following code in, for instance, an initializer:
 
 <pre>
-IdealGateway.acquirer = :ing # Other banks preloaded are :abnamro and :rabobank
-IdealGateway.merchant_id = '00123456789'
-IdealGateway.passphrase = 'the_private_key_passphrase'
+ActiveMerchant::Billing::IdealGateway.acquirer = :ing # Other banks preloaded are :abnamro and :rabobank
+ActiveMerchant::Billing::IdealGateway.merchant_id = '00123456789'
+ActiveMerchant::Billing::IdealGateway.passphrase = 'the_private_key_passphrase'
 
 # CERTIFICATE_ROOT points to a directory where the key and certificates are located
-IdealGateway.private_key_file = File.join(CERTIFICATE_ROOT, 'private_key.pem')
-IdealGateway.private_certificate_file = File.join(CERTIFICATE_ROOT, 'private_certificate.cer')
-IdealGateway.ideal_certificate_file = File.join(CERTIFICATE_ROOT, 'ideal.cer')
+ActiveMerchant::Billing::IdealGateway.private_key_file = File.join(CERTIFICATE_ROOT, 'private_key.pem')
+ActiveMerchant::Billing::IdealGateway.private_certificate_file = File.join(CERTIFICATE_ROOT, 'private_certificate.cer')
+ActiveMerchant::Billing::IdealGateway.ideal_certificate_file = File.join(CERTIFICATE_ROOT, 'ideal.cer')
 </pre>
 
 h3. View
