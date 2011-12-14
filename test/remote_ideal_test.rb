@@ -65,6 +65,7 @@ class IdealTest < Test::Unit::TestCase
   end
 
   def test_successful_transaction
+    p capture_transaction(:success)
     assert_success capture_transaction(:success)
   end
 

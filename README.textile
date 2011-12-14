@@ -41,10 +41,10 @@ As a gem:
 sudo gem install active_merchant_ideal 
 </pre>
 
-Add the following to your environment.rb:
+Add the following to your Gemfile:
 
 <pre>
-config.gem 'active_merchant_ideal'
+gem 'active_merchant_ideal'
 </pre>
 
 As a plugin:
@@ -78,7 +78,8 @@ h3. Test the gem
 You can run the tests from this gem with (inside the active_merchant_ideal directory):
 
 <pre>
-rake test
+ bundle install
+ bundle exec rake test
 </pre>
 
 h3. Run the remote tests (For ING BANK and Rabobank only)
@@ -89,7 +90,7 @@ h3. Run the remote tests (For ING BANK and Rabobank only)
 * For running the *seven prescribed remote test transactions* (ING bank and Rabobank) which are needed to activate the iDEAL account use 
 
 <pre>
-rake test:remote
+ bundle exec rake test:remote
 </pre>
 
 h3. Compatibility
