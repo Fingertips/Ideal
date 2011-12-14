@@ -189,6 +189,23 @@ module ActiveMerchant #:nodoc:
                         verify(OpenSSL::Digest::SHA1.new, signature, message)
       end
 
+      # Returns the bankaccount number when the transaction was successful.
+      def consumer_account_number
+        text('//consumerAccountNumber')
+      end
+
+      # Returns the name on the bankaccount of the customer when the 
+      # transaction was successful.
+      def consumer_name
+        text('//consumerName')
+      end
+
+      # Returns the city on the bankaccount of the customer when the
+      # transaction was successful.
+      def consumer_city
+        text('//consumerCity')
+      end
+
       private
 
       # Checks if no errors occured _and_ if the message was authentic.
