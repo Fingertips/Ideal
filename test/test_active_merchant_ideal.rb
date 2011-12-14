@@ -514,6 +514,15 @@ module IdealTestCases
 
       assert !capture_response.success?
     end
+    
+    def test_capture_of_consumer_fields
+      expects_request_and_returns ACQUIRER_SUCCEEDED_STATUS_RESPONSE
+      capture_response = @gateway.capture('0001023456789112')
+      
+      assert_equal '0949298989', capture_response.consumer_account_number
+      assert_equal 'Onderheuvel', capture_response.consumer_name
+      assert_equal 'DEN HAAG', capture_response.consumer_city
+    end
 
     def test_returns_status
       response = IdealStatusResponse.new(ACQUIRER_SUCCEEDED_STATUS_RESPONSE)
