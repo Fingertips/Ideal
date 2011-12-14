@@ -1,5 +1,7 @@
 h1. Active_merchant_ideal
 
+"!https://secure.travis-ci.org/dovadi/active_merchant_ideal.png!":http://travis-ci.org/dovadi/active_merchant_ideal
+
 h2. ATTENTION: transition period with a new certificate (ING only)
 
 Recently ING issued a new iDEAL certificate, which should be in production before May 23 2011. See "Wijzigen van een acquiring certificaat in
