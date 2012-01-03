@@ -114,6 +114,8 @@ module Ideal
         acquirers[@acquirer].each do |attr, value|
           send("#{attr}=", value)
         end
+      else
+        raise ArgumentError, "Unknown acquirer `#{acquirer}', please choose one of: #{self.acquirers.keys.join(', ')}"
       end
     end
 

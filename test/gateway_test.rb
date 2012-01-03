@@ -48,6 +48,12 @@ module IdealTestCases
       assert_equal 'https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml', Ideal::Gateway.live_status_url
     end
 
+    def test_does_not_allow_configuration_of_unknown_acquirers
+      assert_raise(ArgumentError) do
+        Ideal::Gateway.acquirer = :unknown
+      end
+    end
+
     def test_acquirers
       assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', Ideal::Gateway.acquirers['rabobank']['live_url']
       assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', Ideal::Gateway.acquirers['ing']['live_url']
