@@ -1,6 +1,6 @@
 h1. Active_merchant_ideal
 
-"!https://secure.travis-ci.org/dovadi/active_merchant_ideal.png!":http://travis-ci.org/dovadi/active_merchant_ideal
+"!https://secure.travis-ci.org/Fingertips/Ideal.png!":http://travis-ci.org/Fingertips/Ideal
 
 h2. ATTENTION: transition period with a new certificate (ING only)
 
