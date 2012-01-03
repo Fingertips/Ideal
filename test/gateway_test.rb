@@ -1,18 +1,17 @@
-# encoding: utf-8
-
-require File.expand_path(File.dirname(__FILE__))  + '/helper'
+require File.expand_path('../helper', __FILE__)
 
 module IdealTestCases
   # This method is called at the end of the file when all fixture data has been loaded.
   def self.setup_ideal_gateway!
-    ActiveMerchant::Billing::IdealGateway.class_eval do
+    Ideal::Gateway.class_eval do
+      self.acquirer = :ing
+
       self.merchant_id = '123456789'
 
       self.passphrase = 'passphrase'
       self.private_key = PRIVATE_KEY
       self.private_certificate = PRIVATE_CERTIFICATE
       self.ideal_certificate = IDEAL_CERTIFICATE
-      self.acquirer = :ing
     end
   end
 
@@ -27,79 +26,85 @@ module IdealTestCases
 
   class ClassMethodsTest < Test::Unit::TestCase
     def test_merchant_id
-      assert_equal IdealGateway.merchant_id, '123456789'
+      assert_equal Ideal::Gateway.merchant_id, '123456789'
     end
 
     def test_verify_live_url_for_ing
-      ActiveMerchant::Billing::IdealGateway.acquirer = :ing
-      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', IdealGateway.live_url
+      Ideal::Gateway.acquirer = :ing
+      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', Ideal::Gateway.live_url
     end
 
     def test_verify_live_url_for_rabobank
-      ActiveMerchant::Billing::IdealGateway.acquirer = :rabobank
-      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', IdealGateway.live_url
+      Ideal::Gateway.acquirer = :rabobank
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', Ideal::Gateway.live_url
     end
 
     def test_verify_live_urls_for_abnamro
-      ActiveMerchant::Billing::IdealGateway.acquirer = :abnamro
-      assert_equal 'https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml', IdealGateway.live_directory_url
-      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', IdealGateway.live_transaction_url
-      assert_equal 'https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml', IdealGateway.live_status_url
+      Ideal::Gateway.acquirer = :abnamro
+      assert_equal 'https://idealm.abnamro.nl/nl/issuerInformation/getIssuerInformation.xml', Ideal::Gateway.live_directory_url
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', Ideal::Gateway.live_transaction_url
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerStatusInquiry/getAcquirerStatusInquiry.xml', Ideal::Gateway.live_status_url
     end
 
     def test_acquirers
-      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', IdealGateway.acquirers['rabobank']['live']
-      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', IdealGateway.acquirers['ing']['live']
-      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', IdealGateway.acquirers['abnamro']['live']['transaction']
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', Ideal::Gateway.acquirers['rabobank']['live_url']
+      assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', Ideal::Gateway.acquirers['ing']['live_url']
+      assert_equal 'https://idealm.abnamro.nl/nl/acquirerTrxRegistration/getAcquirerTrxRegistration.xml', Ideal::Gateway.acquirers['abnamro']['live_transaction_url']
     end
 
     def test_private_certificate_returns_a_loaded_Certificate_instance
-      assert_equal IdealGateway.private_certificate.to_text,
+      assert_equal Ideal::Gateway.private_certificate.to_text,
         OpenSSL::X509::Certificate.new(PRIVATE_CERTIFICATE).to_text
     end
 
     def test_private_key_returns_a_loaded_PKey_RSA_instance
-      assert_equal IdealGateway.private_key.to_text,
-        OpenSSL::PKey::RSA.new(PRIVATE_KEY, IdealGateway.passphrase).to_text
+      assert_equal Ideal::Gateway.private_key.to_text,
+        OpenSSL::PKey::RSA.new(PRIVATE_KEY, Ideal::Gateway.passphrase).to_text
     end
 
     def test_ideal_certificate_returns_a_loaded_Certificate_instance
-      assert_equal IdealGateway.ideal_certificate.to_text,
+      assert_equal Ideal::Gateway.ideal_certificate.to_text,
         OpenSSL::X509::Certificate.new(IDEAL_CERTIFICATE).to_text
     end
   end
 
   class GeneralTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
+      @gateway = Ideal::Gateway.new
     end
-
+  
     def test_optional_initialization_options
-      assert_equal 0, IdealGateway.new.sub_id
-      assert_equal 1, IdealGateway.new(:sub_id => 1).sub_id
+      assert_equal 0, Ideal::Gateway.new.sub_id
+      assert_equal 1, Ideal::Gateway.new(:sub_id => 1).sub_id
     end
-
+  
     def test_returns_the_test_url_when_in_the_test_env
-      @gateway.stubs(:test?).returns(true)
-      assert_equal IdealGateway.test_directory_url,   @gateway.send(:acquirer_url,:directory)
-      assert_equal IdealGateway.test_transaction_url, @gateway.send(:acquirer_url,:transaction)
-      assert_equal IdealGateway.test_status_url,      @gateway.send(:acquirer_url,:status)
+      Ideal::Gateway.acquirer = :ing
+      Ideal::Gateway.environment = :test
+      assert_equal Ideal::Gateway.test_url, @gateway.send(:request_url, :directory)
+    end
+  
+    def test_returns_the_live_url_when_not_in_the_test_env
+      Ideal::Gateway.acquirer = :ing
+      Ideal::Gateway.environment = :live
+      assert_equal Ideal::Gateway.live_url, @gateway.send(:request_url, :directory)
     end
 
-    def test_returns_the_live_url_when_not_in_the_test_env
-      @gateway.stubs(:test?).returns(false)
-      assert_equal IdealGateway.live_directory_url,   @gateway.send(:acquirer_url,:directory)
-      assert_equal IdealGateway.live_transaction_url, @gateway.send(:acquirer_url,:transaction)
-      assert_equal IdealGateway.live_status_url,      @gateway.send(:acquirer_url,:status)
-    end
+  def test_returns_the_special_urls_for_abnamro_when_in_the_test_env
+    Ideal::Gateway.acquirer = :abnamro
+    Ideal::Gateway.environment = :test
+    assert_equal Ideal::Gateway.test_directory_url,   @gateway.send(:request_url, :directory)
+    assert_equal Ideal::Gateway.test_transaction_url, @gateway.send(:request_url, :transaction)
+    assert_equal Ideal::Gateway.test_status_url,      @gateway.send(:request_url, :status)
+  end
 
     def test_returns_created_at_timestamp
       timestamp = '2001-12-17T09:30:47.000Z'
       Time.any_instance.stubs(:gmtime).returns(DateTime.parse(timestamp))
-
+  
       assert_equal timestamp, @gateway.send(:created_at_timestamp)
     end
-
+  
     def test_ruby_to_java_keys_conversion
       keys = [
         [:acquirer_transaction_request, 'AcquirerTrxReq'],
@@ -118,118 +123,121 @@ module IdealTestCases
         [:expiration_period,            'expirationPeriod'],
         [:entrance_code,                'entranceCode']
       ]
-
+  
       keys.each do |key, expected_key|
         assert_equal expected_key, @gateway.send(:javaize_key, key)
       end
     end
-
+  
     def test_does_not_convert_unknown_key_to_java_key
       assert_equal 'not_a_registered_key', @gateway.send(:javaize_key, :not_a_registered_key)
     end
-
+  
     def test_token_generation
       expected_token = Digest::SHA1.hexdigest(OpenSSL::X509::Certificate.new(PRIVATE_CERTIFICATE).to_der).upcase
       assert_equal expected_token, @gateway.send(:token)
     end
-
+  
     def test_token_code_generation
-      IdealGateway.whitespace_behaviour = nil
+      Ideal::Gateway.acquirer = :ing
       message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
       stripped_message = message.gsub(/\s/m, '')
-
+  
       sha1 = OpenSSL::Digest::SHA1.new
       OpenSSL::Digest::SHA1.stubs(:new).returns(sha1)
-
-      signature = IdealGateway.private_key.sign(sha1, stripped_message)
+  
+      signature = Ideal::Gateway.private_key.sign(sha1, stripped_message)
       encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
-
+  
       assert_equal encoded_signature, @gateway.send(:token_code, message)
     end
-
+  
     def test_token_code_generation_on_abn_amro
-      IdealGateway.whitespace_behaviour = :abnamro
+      Ideal::Gateway.acquirer = :abnamro
       message = "Top\tsecret\tman.\nI could tell you, but\r then I'd have to kill you…"
       stripped_message = message.gsub(/(\f|\n|\r|\t|\v)/m, '')
-
+  
       sha1 = OpenSSL::Digest::SHA1.new
       OpenSSL::Digest::SHA1.stubs(:new).returns(sha1)
-
-      signature = IdealGateway.private_key.sign(sha1, stripped_message)
+  
+      signature = Ideal::Gateway.private_key.sign(sha1, stripped_message)
       encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
-
+  
       assert_equal encoded_signature, @gateway.send(:token_code, message)
     end
-
-    def test_posts_data_with_ssl_to_acquirer_url_and_return_the_correct_response
-      IdealResponse.expects(:new).with('response', :test => true)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'data').returns('response')
-      @gateway.send(:post_data, @gateway.acquirer_url(:directory), 'data', IdealResponse)
-
-      @gateway.stubs(:test?).returns(false)
-      IdealResponse.expects(:new).with('response', :test => false)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'data').returns('response')
-      @gateway.send(:post_data, @gateway.acquirer_url(:directory), 'data', IdealResponse)
+  
+    def test_posts_data_with_ssl_to_request_url_and_return_the_correct_response_for_test
+      Ideal::Gateway.environment = :test
+      Ideal::Response.expects(:new).with('response', :test => true)
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:directory), 'data').returns('response')
+      @gateway.send(:post_data, @gateway.request_url(:directory), 'data', Ideal::Response)
+    end
+    
+    def test_posts_data_with_ssl_to_request_url_and_return_the_correct_response_for_live
+      Ideal::Gateway.environment = :live
+      Ideal::Response.expects(:new).with('response', :test => false)
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:directory), 'data').returns('response')
+      @gateway.send(:post_data, @gateway.request_url(:directory), 'data', Ideal::Response)
     end
   end
-
+  
   class XMLBuildingTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
+      @gateway = Ideal::Gateway.new
     end
-
+  
     def test_contains_correct_info_in_root_node
       expected_xml = Builder::XmlMarkup.new
       expected_xml.instruct!
-      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => IdealGateway::XML_NAMESPACE, 'version' => IdealGateway::API_VERSION) {}
-
+      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => Ideal::Gateway::XML_NAMESPACE, 'version' => Ideal::Gateway::API_VERSION) {}
+  
       assert_equal expected_xml.target!, @gateway.send(:xml_for, :acquirer_transaction_request, [])
     end
-
+  
     def test_creates_correct_xml_with_java_keys_from_array_with_ruby_keys
       expected_xml = Builder::XmlMarkup.new
       expected_xml.instruct!
-      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => IdealGateway::XML_NAMESPACE, 'version' => IdealGateway::API_VERSION) do
+      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => Ideal::Gateway::XML_NAMESPACE, 'version' => Ideal::Gateway::API_VERSION) do
         expected_xml.tag!('a_parent') do
           expected_xml.tag!('createDateTimeStamp', '2009-01-26')
         end
       end
-
+  
       assert_equal expected_xml.target!, @gateway.send(:xml_for, :acquirer_transaction_request, [[:a_parent, [[:created_at, '2009-01-26']]]])
     end
   end
-
+  
   class RequestBodyBuildingTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
-
+      @gateway = Ideal::Gateway.new
+  
       @gateway.stubs(:created_at_timestamp).returns('created_at_timestamp')
       @gateway.stubs(:token).returns('the_token')
       @gateway.stubs(:token_code)
-
+  
       @transaction_id = '0001023456789112'
     end
-
+  
     def test_build_transaction_request_body_raises_ArgumentError_with_missing_required_options
       options = VALID_PURCHASE_OPTIONS.dup
       options.keys.each do |key|
         options.delete(key)
-
+  
         assert_raise(ArgumentError) do
           @gateway.send(:build_transaction_request_body, 100, options)
         end
       end
     end
-
+  
     def test_valid_with_valid_options
       assert_not_nil @gateway.send(:build_transaction_request_body, 4321, VALID_PURCHASE_OPTIONS)
     end
-
+  
     def test_checks_that_fields_are_not_too_long
       assert_raise ArgumentError do
         @gateway.send(:build_transaction_request_body, 1234567890123, VALID_PURCHASE_OPTIONS) # 13 chars
       end
-
+  
       [
         [:order_id, '12345678901234567'], # 17 chars,
         [:description, '123456789012345678901234567890123'], # 33 chars
@@ -237,172 +245,172 @@ module IdealTestCases
       ].each do |key, value|
         options = VALID_PURCHASE_OPTIONS.dup
         options[key] = value
-
+  
         assert_raise ArgumentError do
           @gateway.send(:build_transaction_request_body, 4321, options)
         end
       end
     end
-
+  
     def test_checks_that_fields_do_not_contain_diacritical_characters
       assert_raise ArgumentError do
         @gateway.send(:build_transaction_request_body, 'graphème', VALID_PURCHASE_OPTIONS)
       end
-
+  
       [:order_id, :description, :entrance_code].each do |key, value|
         options = VALID_PURCHASE_OPTIONS.dup
         options[key] = 'graphème'
-
+  
         assert_raise ArgumentError do
           @gateway.send(:build_transaction_request_body, 4321, options)
         end
       end
     end
-
+  
     def test_builds_a_transaction_request_body
       money = 4321
-
+  
       message = 'created_at_timestamp' +
                 VALID_PURCHASE_OPTIONS[:issuer_id] +
-                IdealGateway.merchant_id +
+                Ideal::Gateway.merchant_id +
                 @gateway.sub_id.to_s +
                 VALID_PURCHASE_OPTIONS[:return_url] +
                 VALID_PURCHASE_OPTIONS[:order_id] +
                 money.to_s +
-                IdealGateway::CURRENCY +
-                IdealGateway::LANGUAGE +
+                Ideal::Gateway::CURRENCY +
+                Ideal::Gateway::LANGUAGE +
                 VALID_PURCHASE_OPTIONS[:description] +
                 VALID_PURCHASE_OPTIONS[:entrance_code]
-
+  
       @gateway.expects(:token_code).with(message).returns('the_token_code')
-
+  
       @gateway.expects(:xml_for).with(:acquirer_transaction_request, [
         [:created_at, 'created_at_timestamp'],
         [:issuer, [[:issuer_id, VALID_PURCHASE_OPTIONS[:issuer_id]]]],
-
+  
         [:merchant, [
-          [:merchant_id,         IdealGateway.merchant_id],
+          [:merchant_id,         Ideal::Gateway.merchant_id],
           [:sub_id,              @gateway.sub_id],
-          [:authentication,      IdealGateway::AUTHENTICATION_TYPE],
+          [:authentication,      Ideal::Gateway::AUTHENTICATION_TYPE],
           [:token,               'the_token'],
           [:token_code,          'the_token_code'],
           [:merchant_return_url, VALID_PURCHASE_OPTIONS[:return_url]]
         ]],
-
+  
         [:transaction, [
           [:purchase_id,       VALID_PURCHASE_OPTIONS[:order_id]],
           [:amount,            money],
-          [:currency,          IdealGateway::CURRENCY],
+          [:currency,          Ideal::Gateway::CURRENCY],
           [:expiration_period, VALID_PURCHASE_OPTIONS[:expiration_period]],
-          [:language,          IdealGateway::LANGUAGE],
+          [:language,          Ideal::Gateway::LANGUAGE],
           [:description,       VALID_PURCHASE_OPTIONS[:description]],
           [:entrance_code,     VALID_PURCHASE_OPTIONS[:entrance_code]]
         ]]
       ])
-
+  
       @gateway.send(:build_transaction_request_body, money, VALID_PURCHASE_OPTIONS)
     end
-
+  
     def test_builds_a_directory_request_body
-      message = 'created_at_timestamp' + IdealGateway.merchant_id + @gateway.sub_id.to_s
+      message = 'created_at_timestamp' + Ideal::Gateway.merchant_id + @gateway.sub_id.to_s
       @gateway.expects(:token_code).with(message).returns('the_token_code')
-
+  
       @gateway.expects(:xml_for).with(:directory_request, [
         [:created_at, 'created_at_timestamp'],
         [:merchant, [
-          [:merchant_id,    IdealGateway.merchant_id],
+          [:merchant_id,    Ideal::Gateway.merchant_id],
           [:sub_id,         @gateway.sub_id],
-          [:authentication, IdealGateway::AUTHENTICATION_TYPE],
+          [:authentication, Ideal::Gateway::AUTHENTICATION_TYPE],
           [:token,          'the_token'],
           [:token_code,     'the_token_code']
         ]]
       ])
-
+  
       @gateway.send(:build_directory_request_body)
     end
-
+  
     def test_builds_a_status_request_body_raises_ArgumentError_with_missing_required_options
       assert_raise(ArgumentError) do
         @gateway.send(:build_status_request_body, {})
       end
     end
-
+  
     def test_builds_a_status_request_body
       options = { :transaction_id => @transaction_id }
-
-      message = 'created_at_timestamp' + IdealGateway.merchant_id + @gateway.sub_id.to_s + options[:transaction_id]
+  
+      message = 'created_at_timestamp' + Ideal::Gateway.merchant_id + @gateway.sub_id.to_s + options[:transaction_id]
       @gateway.expects(:token_code).with(message).returns('the_token_code')
-
+  
       @gateway.expects(:xml_for).with(:acquirer_status_request, [
         [:created_at, 'created_at_timestamp'],
         [:merchant, [
-          [:merchant_id,    IdealGateway.merchant_id],
+          [:merchant_id,    Ideal::Gateway.merchant_id],
           [:sub_id,         @gateway.sub_id],
-          [:authentication, IdealGateway::AUTHENTICATION_TYPE],
+          [:authentication, Ideal::Gateway::AUTHENTICATION_TYPE],
           [:token,          'the_token'],
           [:token_code,     'the_token_code']
         ]],
-
+  
         [:transaction, [
           [:transaction_id, options[:transaction_id]]
         ]],
       ])
-
+  
       @gateway.send(:build_status_request_body, options)
     end
   end
-
+  
   class GeneralResponseTest < Test::Unit::TestCase
     def test_resturns_if_it_is_a_test_request
-      assert IdealResponse.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS, :test => true).test?
-
-      assert !IdealResponse.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS, :test => false).test?
-      assert !IdealResponse.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS).test?
+      assert Ideal::Response.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS, :test => true).test?
+  
+      assert !Ideal::Response.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS, :test => false).test?
+      assert !Ideal::Response.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS).test?
     end
   end
-
+  
   class SuccessfulResponseTest < Test::Unit::TestCase
     def setup
-      @response = IdealResponse.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
+      @response = Ideal::Response.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
     end
-
+  
     def test_initializes_with_only_response_body
       assert_equal REXML::Document.new(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS).root.to_s,
                     @response.instance_variable_get(:@response).to_s
     end
-
+  
     def test_successful
       assert @response.success?
     end
-
+  
     def test_returns_no_error_messages
       assert_nil @response.error_message
     end
-
+  
     def test_returns_no_error_code
       assert_nil @response.error_code
     end
   end
-
+  
   class ErrorResponseTest < Test::Unit::TestCase
     def setup
-      @response = IdealResponse.new(ERROR_RESPONSE)
+      @response = Ideal::Response.new(ERROR_RESPONSE)
     end
-
+  
     def test_unsuccessful
       assert !@response.success?
     end
-
+  
     def test_returns_error_messages
       assert_equal 'Failure in system', @response.error_message
       assert_equal 'System generating error: issuer', @response.error_details
       assert_equal 'Betalen met iDEAL is nu niet mogelijk.', @response.consumer_error_message
     end
-
+  
     def test_returns_error_code
       assert_equal 'SO1000', @response.error_code
     end
-
+  
     def test_returns_error_type
       [
         ['IX1000', :xml],
@@ -416,27 +424,27 @@ module IdealTestCases
       end
     end
   end
-
+  
   class DirectoryTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
+      @gateway = Ideal::Gateway.new
     end
-
+  
     def test_returns_a_list_with_only_one_issuer
       @gateway.stubs(:build_directory_request_body).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_ONE_ISSUER)
-
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_ONE_ISSUER)
+  
       expected_issuers = [{ :id => '1006', :name => 'ABN AMRO Bank' }]
-
+  
       directory_response = @gateway.issuers
-      assert_instance_of IdealDirectoryResponse, directory_response
+      assert_instance_of Ideal::DirectoryResponse, directory_response
       assert_equal expected_issuers, directory_response.list
     end
-
+  
     def test_returns_list_of_issuers_from_response
       @gateway.stubs(:build_directory_request_body).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
-
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:directory), 'the request body').returns(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
+  
       expected_issuers = [
         { :id => '1006', :name => 'ABN AMRO Bank' },
         { :id => '1003', :name => 'Postbank' },
@@ -444,76 +452,76 @@ module IdealTestCases
         { :id => '1017', :name => 'Asr bank' },
         { :id => '1023', :name => 'Van Lanschot' }
       ]
-
+  
       directory_response = @gateway.issuers
-      assert_instance_of IdealDirectoryResponse, directory_response
+      assert_instance_of Ideal::DirectoryResponse, directory_response
       assert_equal expected_issuers, directory_response.list
     end
   end
-
+  
   class SetupPurchaseTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
-
+      @gateway = Ideal::Gateway.new
+  
       @gateway.stubs(:build_transaction_request_body).with(4321, VALID_PURCHASE_OPTIONS).returns('the request body')
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:transaction), 'the request body').returns(ACQUIRER_TRANSACTION_RESPONSE)
-
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:transaction), 'the request body').returns(ACQUIRER_TRANSACTION_RESPONSE)
+  
       @setup_purchase_response = @gateway.setup_purchase(4321, VALID_PURCHASE_OPTIONS)
     end
-
+  
     def test_setup_purchase_returns_IdealTransactionResponse
-      assert_instance_of IdealTransactionResponse, @setup_purchase_response
+      assert_instance_of Ideal::TransactionResponse, @setup_purchase_response
     end
-
+  
     def test_setup_purchase_returns_response_with_service_url
       assert_equal 'https://ideal.example.com/long_service_url?X009=BETAAL&X010=20', @setup_purchase_response.service_url
     end
-
+  
     def test_setup_purchase_returns_response_with_transaction_and_order_ids
       assert_equal '0001023456789112', @setup_purchase_response.transaction_id
       assert_equal 'iDEAL-aankoop 21', @setup_purchase_response.order_id
     end
   end
-
+  
   class CapturePurchaseTest < Test::Unit::TestCase
     def setup
-      @gateway = IdealGateway.new
-
+      @gateway = Ideal::Gateway.new
+  
       @gateway.stubs(:build_status_request_body).
         with(:transaction_id => '0001023456789112').returns('the request body')
     end
-
+  
     def test_setup_purchase_returns_IdealStatusResponse
       expects_request_and_returns ACQUIRER_SUCCEEDED_STATUS_RESPONSE
-      assert_instance_of IdealStatusResponse, @gateway.capture('0001023456789112')
+      assert_instance_of Ideal::StatusResponse, @gateway.capture('0001023456789112')
     end
-
+  
     # Because we don't have a real private key and certificate we stub
     # verified? to return true. However, this is properly tested in the remote
     # tests.
     def test_capture_of_successful_payment
-      IdealStatusResponse.any_instance.stubs(:verified?).returns(true)
-
+      Ideal::StatusResponse.any_instance.stubs(:verified?).returns(true)
+  
       expects_request_and_returns ACQUIRER_SUCCEEDED_STATUS_RESPONSE
       capture_response = @gateway.capture('0001023456789112')
-
+  
       assert capture_response.success?
     end
-
+  
     def test_capture_of_failed_payment
       expects_request_and_returns ACQUIRER_FAILED_STATUS_RESPONSE
       capture_response = @gateway.capture('0001023456789112')
-
+  
       assert !capture_response.success?
     end
-
+  
     def test_capture_of_successful_payment_but_message_does_not_match_signature
       expects_request_and_returns ACQUIRER_SUCCEEDED_BUT_WRONG_SIGNATURE_STATUS_RESPONSE
       capture_response = @gateway.capture('0001023456789112')
-
+      
       assert !capture_response.success?
     end
-    
+      
     def test_capture_of_consumer_fields
       expects_request_and_returns ACQUIRER_SUCCEEDED_STATUS_RESPONSE
       capture_response = @gateway.capture('0001023456789112')
@@ -522,9 +530,9 @@ module IdealTestCases
       assert_equal 'Onderheuvel', capture_response.consumer_name
       assert_equal 'DEN HAAG', capture_response.consumer_city
     end
-
+      
     def test_returns_status
-      response = IdealStatusResponse.new(ACQUIRER_SUCCEEDED_STATUS_RESPONSE)
+      response = Ideal::StatusResponse.new(ACQUIRER_SUCCEEDED_STATUS_RESPONSE)
       [
         ['Success',   :success],
         ['Cancelled', :cancelled],
@@ -536,11 +544,11 @@ module IdealTestCases
         assert_equal expected_status, response.status
       end
     end
-
+      
     private
-
+      
     def expects_request_and_returns(str)
-      @gateway.expects(:ssl_post).with(@gateway.acquirer_url(:status), 'the request body').returns(str)
+      @gateway.expects(:ssl_post).with(@gateway.request_url(:status), 'the request body').returns(str)
     end
   end
 

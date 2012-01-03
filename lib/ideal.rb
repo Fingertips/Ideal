@@ -1,3 +1,12 @@
-require 'active_merchant'
-require 'ideal/ideal.rb'
-require 'ideal/ideal_response.rb'
+# encoding: utf-8
+
+require 'active_support/core_ext'
+require 'builder'
+
+require 'ideal/acquirers'
+require 'ideal/gateway'
+require 'ideal/response'
+require 'ideal/version'
+
+module Ideal
+end
