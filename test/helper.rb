@@ -7,11 +7,13 @@ $LOAD_PATH.unshift(File.dirname(__FILE__))
 
 require 'ideal'
 
+$stdout.sync = true
+
 module Test
   module Unit
     class TestCase
       HOME_DIR = RUBY_PLATFORM =~ /mswin32/ ? ENV['HOMEPATH'] : ENV['HOME'] unless defined?(HOME_DIR)
-      LOCAL_CREDENTIALS = File.join(HOME_DIR.to_s, '.active_merchant/fixtures.yml') unless defined?(LOCAL_CREDENTIALS)
+      LOCAL_CREDENTIALS = File.join(HOME_DIR.to_s, '.ideal/fixtures.yml') unless defined?(LOCAL_CREDENTIALS)
       DEFAULT_CREDENTIALS = File.join(File.dirname(__FILE__), 'fixtures.yml') unless defined?(DEFAULT_CREDENTIALS)
 
       private
@@ -22,7 +24,6 @@ module Test
 
       def fixtures(key)
         data = all_fixtures[key] || raise(StandardError, "No fixture data was found for '#{key}'")
-
         data.dup
       end
 

@@ -2,6 +2,7 @@
 
 require 'active_support/core_ext'
 require 'builder'
+require 'rest'
 
 require 'ideal/acquirers'
 require 'ideal/gateway'

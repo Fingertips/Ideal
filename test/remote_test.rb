@@ -1,13 +1,13 @@
 # encoding: utf-8
 
-require File.expand_path(File.dirname(__FILE__))  + '/helper'
+require File.expand_path('../helper', __FILE__)
 
 class IdealTest < Test::Unit::TestCase
   def setup
-    Base.mode = :test
-    setup_ideal_gateway(fixtures(:ideal_ing_postbank))
+    setup_ideal_gateway(fixtures(:default))
+    Ideal::Gateway.environment = :test
 
-    @gateway = IdealGateway.new
+    @gateway = Ideal::Gateway.new
 
     @valid_options = {
       :issuer_id         => '0151',
@@ -26,7 +26,6 @@ class IdealTest < Test::Unit::TestCase
 
   def test_setup_purchase_with_valid_options
     response = @gateway.setup_purchase(550, @valid_options)
-
     assert_success response
     assert_not_nil response.service_url
     assert_not_nil response.transaction_id
@@ -44,7 +43,7 @@ class IdealTest < Test::Unit::TestCase
 
   # TODO: Should we raise a SecurityError instead of setting success to false?
   def test_status_response_with_invalid_signature
-    IdealStatusResponse.any_instance.stubs(:signature).returns('db82/jpJRvKQKoiDvu33X0yoDAQpayJOaW2Y8zbR1qk1i3epvTXi+6g+QVBY93YzGv4w+Va+vL3uNmzyRjYsm2309d1CWFVsn5Mk24NLSvhYfwVHEpznyMqizALEVUNSoiSHRkZUDfXowBAyLT/tQVGbuUuBj+TKblY826nRa7U=')
+    Ideal::StatusResponse.any_instance.stubs(:signature).returns('db82/jpJRvKQKoiDvu33X0yoDAQpayJOaW2Y8zbR1qk1i3epvTXi+6g+QVBY93YzGv4w+Va+vL3uNmzyRjYsm2309d1CWFVsn5Mk24NLSvhYfwVHEpznyMqizALEVUNSoiSHRkZUDfXowBAyLT/tQVGbuUuBj+TKblY826nRa7U=')
     response = capture_transaction(:success)
 
     assert_failure response
@@ -64,7 +63,7 @@ class IdealTest < Test::Unit::TestCase
   end
 
   def test_successful_transaction
-    p capture_transaction(:success)
+    capture_transaction(:success)
     assert_success capture_transaction(:success)
   end
 
@@ -129,13 +128,76 @@ class IdealTest < Test::Unit::TestCase
     response
   end
 
-  # Setup the gateway by providing a hash of aatributes and values.
+  # Setup the gateway by providing a hash of attributes and values.
   def setup_ideal_gateway(fixture)
     fixture = fixture.dup
+    # The passphrase needs to be set first, otherwise the key won't initialize properly
     if passphrase = fixture.delete(:passphrase)
-      IdealGateway.passphrase = passphrase
+      Ideal::Gateway.passphrase = passphrase
     end
-    fixture.each { |key, value| IdealGateway.send("#{key}=", value) }
-    IdealGateway.live_url = nil
+    fixture.each { |key, value| Ideal::Gateway.send("#{key}=", value) }
+    Ideal::Gateway.live_url = nil
+  end
+
+  # Allows the testing of you to check for negative assertions:
+  # 
+  #   # Instead of
+  #   assert !something_that_is_false
+  # 
+  #   # Do this
+  #   assert_false something_that_should_be_false
+  # 
+  # An optional +msg+ parameter is available to help you debug.
+  def assert_false(boolean, message = nil)
+    message = build_message message, '<?> is not false or nil.', boolean
+
+    clean_backtrace do
+      assert_block message do
+        not boolean
+      end
+    end
+  end
+
+  # A handy little assertion to check for a successful response:
+  # 
+  #   # Instead of
+  #   assert response.success?
+  # 
+  #   # DRY that up with
+  #   assert_success response
+  # 
+  # A message will automatically show the inspection of the response
+  # object if things go afoul.
+  def assert_success(response)
+    clean_backtrace do
+      assert response.success?, "Response failed: #{response.inspect}"
+    end
+  end
+
+  # The negative of +assert_success+
+  def assert_failure(response)
+    clean_backtrace do
+      assert_false response.success?, "Response expected to fail: #{response.inspect}"
+    end
+  end
+
+  def assert_valid(validateable)
+    clean_backtrace do
+      assert validateable.valid?, "Expected to be valid"
+    end
+  end
+
+  def assert_not_valid(validateable)
+    clean_backtrace do
+      assert_false validateable.valid?, "Expected to not be valid"
+    end
+  end
+
+  private
+  def clean_backtrace(&block)
+    yield
+  rescue Test::Unit::AssertionFailedError => e
+    path = File.expand_path(__FILE__)
+    raise Test::Unit::AssertionFailedError, e.message, e.backtrace.reject { |line| File.expand_path(line) =~ /#{path}/ }
   end
 end

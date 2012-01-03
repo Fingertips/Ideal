@@ -11,6 +11,8 @@ module Ideal
   # Note that if the iDEAL system is under load it will _not_ allow more
   # then two retries per request.
   class Response
+    attr_accessor :response
+
     def initialize(response_body, options = {})
       @response = REXML::Document.new(response_body).root
       @success = !error_occured?

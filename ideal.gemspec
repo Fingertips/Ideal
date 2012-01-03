@@ -24,5 +24,6 @@ Gem::Specification.new do |s|
 
   s.add_dependency             "activesupport"
   s.add_dependency             "builder"
+  s.add_dependency             "nap"
   s.add_development_dependency "mocha"
 end
