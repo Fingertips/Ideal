@@ -273,6 +273,14 @@ module Ideal
       Time.now.gmtime.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     end
 
+    def camelize(lower_case_and_underscored_word, first_letter_in_uppercase = true)
+      if first_letter_in_uppercase
+        lower_case_and_underscored_word.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
+      else
+        lower_case_and_underscored_word.to_s[0].chr.downcase + camelize(lower_case_and_underscored_word)[1..-1]
+      end
+    end
+
     # iDeal doesn't really seem to care about nice looking keys in their XML.
     # Probably some Java XML class, hence the method name.
     def javaize_key(key)
@@ -291,7 +299,7 @@ module Ideal
       when 'merchant_return_url'
         'merchantReturnURL'
       when 'token_code', 'expiration_period', 'entrance_code'
-        key[0,1] + key.camelize[1..-1]
+        key[0,1] + camelize(key)[1..-1]
       when /^(\w+)_id$/
         "#{$1}ID"
       else
@@ -324,7 +332,7 @@ module Ideal
     def requires!(options, *keys)
       missing = keys - options.keys
       unless missing.empty?
-        raise ArgumentError, "Missing required options: #{missing.to_sentence}"
+        raise ArgumentError, "Missing required options: #{missing.map { |m| m.to_s }.join(', ')}"
       end
     end
 

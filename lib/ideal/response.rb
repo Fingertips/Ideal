@@ -190,7 +190,7 @@ module Ideal
     # <tt>:failure</tt>.
     def status
       status = text('//status')
-      status.downcase.to_sym unless status.blank?
+      status.downcase.to_sym unless (status.strip == '')
     end
 
     # Returns whether or not the authenticity of the message could be

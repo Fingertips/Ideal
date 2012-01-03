@@ -19,7 +19,7 @@ module Test
       private
 
       def all_fixtures
-        @@fixtures ||= load_fixtures
+        @fixtures ||= load_fixtures
       end
 
       def fixtures(key)
@@ -29,17 +29,7 @@ module Test
 
       def load_fixtures
         file = File.exists?(LOCAL_CREDENTIALS) ? LOCAL_CREDENTIALS : DEFAULT_CREDENTIALS
-        yaml_data = YAML.load(File.read(file))
-        symbolize_keys(yaml_data)
-
-        yaml_data
-      end
-
-      def symbolize_keys(hash)
-        return unless hash.is_a?(Hash)
-
-        hash.symbolize_keys!
-        hash.each{|k,v| symbolize_keys(v)}
+        YAML.load(File.read(file))
       end
     end
   end

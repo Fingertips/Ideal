@@ -4,7 +4,7 @@ require File.expand_path('../helper', __FILE__)
 
 class IdealTest < Test::Unit::TestCase
   def setup
-    setup_ideal_gateway(fixtures(:default))
+    setup_ideal_gateway(fixtures('default'))
     Ideal::Gateway.environment = :test
 
     @gateway = Ideal::Gateway.new
@@ -132,7 +132,7 @@ class IdealTest < Test::Unit::TestCase
   def setup_ideal_gateway(fixture)
     fixture = fixture.dup
     # The passphrase needs to be set first, otherwise the key won't initialize properly
-    if passphrase = fixture.delete(:passphrase)
+    if passphrase = fixture.delete('passphrase')
       Ideal::Gateway.passphrase = passphrase
     end
     fixture.each { |key, value| Ideal::Gateway.send("#{key}=", value) }
