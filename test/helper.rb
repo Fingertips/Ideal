@@ -4,7 +4,7 @@ require 'mocha'
 
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 $LOAD_PATH.unshift(File.dirname(__FILE__))
-require 'active_merchant_ideal'
+require 'ideal'
 
 ActiveMerchant::Billing::Base.mode = :test
 
