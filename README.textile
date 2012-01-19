@@ -1,19 +1,8 @@
-h1. Active_merchant_ideal
+h1. iDEAL
 
 "!https://secure.travis-ci.org/Fingertips/Ideal.png!":http://travis-ci.org/Fingertips/Ideal
 
-h2. ATTENTION: transition period with a new certificate (ING only)
-
-Recently ING issued a new iDEAL certificate, which should be in production before May 23 2011. See "Wijzigen van een acquiring certificaat in
-iDEAL Advanced":http://www.ing.nl/Images/Wijzigen_van_een_acquiring_certificaat_in_iDEAL_Advanced_internet_tcm7-82882.pdf. However ING is not able to say exactly when this migration will take place. This means there will be a transition period in which it's uncertain which iDEAL certificate is needed.
-
-Luckily Roel van Dijk (Voormedia BV) has written a gem/patch, so you can use the old and the new certificate during this transition period.
-
-See "active_merchant_ideal_multicert":https://github.com/rdvdijk/active_merchant_ideal_multicert
-
-h2. Description:
-
-"iDEAL":http://www.ideal.nl payment gateway for "ActiveMerchant":http://www.activemerchant.org.
+Library for the "iDEAL":http://www.ideal.nl payment standard.
 
 h2. What is iDEAL?
 
@@ -33,172 +22,223 @@ In order to use iDEAL you will need to get an iDEAL merchant account from your b
   * Rabobank: Rabo iDEAL Professional. (Unverified)
   * SNS Bank: "Not yet available":http://www.snsbank.nl/zakelijk/betalingsverkeer/kan-ik-ideal-gebruiken-voor-mijn-webwinkel.html
 
-If you implement tests for other banks, if they require such acceptance tests, please do submit a patch or contact me directly: frank@dovadi.com.
+h2. Install
 
-h2. Install active_merchant_ideal:
+The iDEAL gem does not have any large external dependencies. It depends on Nap (a small HTTP library) and Builder (for building XML files). Because of these minor dependencies it's suited to use in Ruby projects other than Ruby on Rails.
 
-As a gem:
+The easiest way to install is as a gem.
 
-<pre>
-sudo gem install active_merchant_ideal 
-</pre>
+<pre><code>sudo gem install ideal</code></pre>
 
-Add the following to your Gemfile:
+Or you can add it as a dependency in your Gemfile.
 
-<pre>
-gem 'active_merchant_ideal'
-</pre>
+<pre><code>gem 'ideal'</code></pre>
 
-As a plugin:
-<pre>
-./script/plugin install git://github.com/dovadi/active_merchant_ideal.git
-</pre>
+Finally, if you don't dig any of that gemming that's so popular nowadays, you can install it as a plugin;
+
+<pre><code>cd vendor/plugins
+git clone --depth 1 git://github.com/Fingertips/Ideal.git ideal</code></pre>
 
 h2. Generate private keys and certificates
 
-Messages to, and from, the acquirer, are all signed in order to prove their authenticity. This means that you will have to have a certificate to sign your messages going to the acquirer _and_ you will need to have the certificate of the acquirer to verify its signed messages.
-
-The latter can be downloaded from your acquirer after registration. The former, however, can be a certificate signed by a CA authority or a self-signed certificate.
+Messages between you and the acquirer are all signed in order to prove their authenticity. You will need a certificate for your side, this can be self-issued. If you like spending money, you can buy a certificate from some SSL authority. The certificate of the acquirer is probably hidden somewhere in plain sight in their documentation.
 
 To create a self-signed certificate follow these steps:
 
 * /usr/bin/openssl genrsa -des3 -out private_key.pem -passout pass:the_passphrase 1024
 * /usr/bin/openssl req -x509 -new -key private_key.pem -passin pass:the_passphrase -days 3650 -out private_certificate.cer
 
-Substitute _the_passphrase__ with your own passphrase.
+Substitute _the_passphrase_ with your own passphrase. You will need to configure that passphrase later on, so hand on to it.
 
-With the ING bank you upload your private certificate with your iDEAL Dashboard. Be aware that there are two dashboards, one "dashboard":https://idealtest.secure-ing.com/ideal/logon_ing.do for the test environment and one "dashboard":https://ideal.secure-ing.com/ideal/logon_ing.do for the production environment!
+You will need to upload your public key (certificate) to your iDEAL dashboard. Usually they have a completely independent test and live environment so you _can_ use different certificates for both.
 
-For more information see:
+For more information on certificates and encryption see:
 * "http://en.wikipedia.org/wiki/Certificate_authority":http://en.wikipedia.org/wiki/Certificate_authority
 * "http://en.wikipedia.org/wiki/Self-signed_certificate":http://en.wikipedia.org/wiki/Self-signed_certificate
 
-h2. Test
+h2. Test and activation
 
-h3. Test the gem
+Once you've uploaded the certificate you need to initiate a number of transactions to complete the activation process. Luckily these transactions are part of the remote test for the gem. It's still kind of a pain, but here we go!
 
-You can run the tests from this gem with (inside the active_merchant_ideal directory):
+<pre><code>git clone --depth 1 git://github.com/Fingertips/Ideal.git ideal
+cd ideal
+bundle install</code></pre>
 
-<pre>
- bundle install
- bundle exec rake test
-</pre>
-
-h3. Run the remote tests (For ING BANK and Rabobank only)
-
-* Create .active_merchant directory in your own home directory
-* Copy test/fixtures.yml to the .active_merchant directory
+* Create the <code>~/.ideal</code> directory.
+* Copy <code>test/fixtures.yml</code> to <code>~/.ideal</code>.
 * Fill in your own merchant id, passphrase and the correct locations to your private key and certificates.
-* For running the *seven prescribed remote test transactions* (ING bank and Rabobank) which are needed to activate the iDEAL account use 
 
-<pre>
- bundle exec rake test:remote
-</pre>
+<pre><code>ruby test/remote_test.rb</code></pre>
+
+If you've succeeded you will see the following:
+
+<pre><code>ruby test/remote_test.rb 
+Loaded suite test/remote_test
+Started
+...........
+Finished in 9.768389 seconds.
+
+11 tests, 33 assertions, 0 failures, 0 errors</code></pre>
+
+If you see test errors, you're on your own (; You can run the test in debug mode to check what's sent across the wire.
+
+<pre><code>ruby -d test/remote_test.rb </code></pre>
+
+h2. Dashboards
+
+h3. ING
+ 
+* "Test dashboard":https://idealtest.secure-ing.com/ideal/logon_ing.do
+* "Live dashboard":https://ideal.secure-ing.com/ideal/logon_ing.do
+
+h3. ABN AMRO
+
+* "Test dashboard":https://abnamro-test.ideal-payment.de/ideal/signupInitiatePreAction.do
+* "Live dashboard":https://abnamro.ideal-payment.de/ideal/signupInitiatePreAction.do
 
 h3. Compatibility
 
-Active_merchant_ideal is tested with Ruby 1.8.7 and 1.9.2.
+We run continuous integration tests with Ruby 1.8.7, 1.9.2, and 1.9.3. We're pretty sure that means it works (see the badge at the top of this file).
 
 h2. Example (Rails)
 
-h3. First configure the gateway
+The following code was written as an example and should not be used without further testing in your application. USE AT YOUR OWN PERIL. Remember to have fun (;
 
-Put the following code in, for instance, an initializer:
+h3. Config
+
+Configure the Gateway somewhere. One place could be <code>config/initializers/ideal.rb</code>.
 
 <pre>
-ActiveMerchant::Billing::IdealGateway.acquirer = :ing # Other banks preloaded are :abnamro and :rabobank
-ActiveMerchant::Billing::IdealGateway.merchant_id = '00123456789'
-ActiveMerchant::Billing::IdealGateway.passphrase = 'the_private_key_passphrase'
+unless Rails.env.production?
+  Ideal::Gateway.environment = :test
+end
 
-# CERTIFICATE_ROOT points to a directory where the key and certificates are located
-ActiveMerchant::Billing::IdealGateway.private_key_file = File.join(CERTIFICATE_ROOT, 'private_key.pem')
-ActiveMerchant::Billing::IdealGateway.private_certificate_file = File.join(CERTIFICATE_ROOT, 'private_certificate.cer')
-ActiveMerchant::Billing::IdealGateway.ideal_certificate_file = File.join(CERTIFICATE_ROOT, 'ideal.cer')
+# Other banks preloaded are :abnamro and :rabobank
+Ideal::Gateway::IdealGateway.acquirer = :ing 
+Ideal::Gateway::IdealGateway.merchant_id = '00123456789'
+
+# Maybe you'd like another location
+ideal_directory = Rails.root + 'config/ideal'
+Ideal::Gateway::IdealGateway.passphrase = 'the_passphrase'
+Ideal::Gateway::IdealGateway.private_key_file         = ideal_directory + 'private_key.pem'
+Ideal::Gateway::IdealGateway.private_certificate_file = ideal_directory + 'private_certificate.cer'
+Ideal::Gateway::IdealGateway.ideal_certificate_file   = ideal_directory + 'ideal.cer'
 </pre>
 
-h3. View
+h3. Show a payment form
 
-Give the consumer a list of available issuer options:
+Show a list of all issuers (banks) to choose from.
 
-<pre>
-gateway = ActiveMerchant::Billing::IdealGateway.new
-issuers = gateway.issuers.list
-sorted_issuers = issuers.sort_by { |issuer| issuer[:name] }
-select('purchase', 'issuer_id', issuers.map { |issuer| [issuer[:name], issuer[:id]] })
-</pre>
+<pre><code>class PaymentsController < ActionController::Base
+  def new
+    @payment = Payment.new
+    @issuers = sorted_issuers
+  end
+  
+  private
+  
+  def ideal
+    Ideal::Gateway.new
+  end
+  
+  def sorted_issuers
+    # NOTE: this does a GET on the bankend, you might want to memoize this
+    ideal.issuers.list.sort_by do |issuer|
+      issuer[:name]
+    end.map do |issuer|
+      [issuer[:name], issuer[:id]]
+    end
+  end
+end
+</code></pre>
 
-Could become:
+<pre><code>
+<%= form_for(@payment) do |f| %
+  <%= f.select(:issuer_id, @issuers)
+<% end %</code></pre>
 
-<pre>
-<select name="purchase[issuer_id]">
+Would result in something like:
+
+<select name="payment[issuer_id]">
   <option value="1006" selected="selected">ABN AMRO Bank</option>
   <option value="1017">Asr bank</option>
   <option value="1003">Postbank</option>
   <option value="1005">Rabobank</option>
   <option value="1023">Van Lanschot</option>
 </select>
-</pre>
 
-h3. Controller
+h3. Set up a payment
 
 First you'll need to setup a transaction and redirect the consumer there so she can make the payment:
 
-<pre>
- class PurchasesController < ActionController::Base
-   def create
-     purchase = @user.purchases.build(:price => 1000) # €10.00 in cents.
-     purchase.save(false) # We want an id for the URL.
+<pre><code>class Payment < ActiveRecord::Base
+  # Validation code used to validate returning notifications from iDeal
+  def ideal_entrance_code
+    Digest::SHA1.hexdigest("#{id}-#{created_at}-#{access_token}")
+  end
+  
+  def ideal_attributes
+    {
+      # The customer has 30 minutes to complete the iDeal transaction (ISO 8601)
+      :expiration_period => "PT30M",
+      :issuer_id         => issuer_id,
+      :return_url        => return_url,
+      :order_id          => id.to_s,
+      :description       => description,
+      :entrance_code     => ideal_entrance_code
+    }
+  end
+end
 
-     purchase_options = {
-       :issuer_id => params[:purchase][:issuer_id],
-       :order_id => purchase.id,
-       :return_url => purchase_url(purchase),
-       :description => 'A Dutch windmill'
-     }
-
-     # Save the purchase instance so that the consumer can return to its resource url to finish the transaction.
-     purchase.update_attributes!(purchase_options)
-
-     gateway = ActiveMerchant::Billing::IdealGateway.new
-     transaction_response = gateway.setup_purchase(purchase.price, purchase_options)
-     if transaction_response.success?
-
-       # Store the transaction_id that the acquirer has created to identify the transaction.
-       purchase.update_attributes!(:transaction_id => transaction_response.transaction_id)
-
-       # Redirect the consumer to the issuer’s payment page.
-       redirect_to transaction_response.service_url
-     end
-   end
- end
-</pre>
+class PaymentsController < ActionController::Base
+  def create
+    payment = Payment.create(params[:payment].merge(
+      :price_in_cents => 1000,                  # €10.00 in cents
+      :return_url => payment_url(payment),      # This is where the customer will be returned to
+      :description => 'A Dutch windmill'        # This will end up on the customer's bank statement (max 32 ASCII chars)
+    ))
+    
+    response = ideal.setup_purchase(payment.price_in_cents, payment.ideal_attributes)
+    if response.success?
+      payment.transaction_id = response.transaction_id
+      payment.status = 'pending'
+      payment.save(false)
+    else
+      Rails.logger.info("Payment initialization failed: [#{response.error_message}] #{response.error_details}")
+    end
+    
+    # Redirect the consumer to the issuer’s payment page.
+    redirect_to response.service_url
+  end
+end</code></pre>
 
 After the consumer is done with the payment she will be redirected to the _:return_url_. It's now _your_ responsibility as merchant to check if the payment has been made:
 
-<pre>
- class PurchasesController < ActionController::Base
-   def show
-     gateway = ActiveMerchant::Billing::IdealGateway.new
-     transaction_status = gateway.capture(@purchase.transaction_id)
+<pre><code>
+class PaymentsController < ActionController::Base
+  def show
+    @payment = Payment.find(params[:id])
+    status = ideal.capture(@payment.transaction_id)
+    if status.success?
+      @payment.update_attributes!(:status => 'paid')
+      flash[:notice] = "Congratulations, you are now the proud owner of a Dutch windmill!"
+    end
+  end
+end
+</code></pre>
 
-     if transaction_status.success?
-       @purchase.update_attributes!(:paid => true)
-       flash[:notice] = "Congratulations, you are now the proud owner of a Dutch windmill!"
-     end
-   end
- end
-</pre>
+h2. Help out!
+
+If you find anything wrong with the gem, we would love to hear from you. Please "create an issue with a patch":https://github.com/Fingertips/iDeal/issues if you run into anything.
 
 h2. History
 
-In 2006 an iDEAL payment library was written in Ruby for a web shop build in Rails for selling mobile phone credits. It was basically a translation of the PHP example given by the iDEAL organization (see iDEAL Advanced Integration Manual PHP). Is was released as the ideal-on-rails library (see "http://dev.dovadi.com/projects/ideal":http://dev.dovadi.com/projects/ideal). 
+In 2006 an iDEAL payment library was written in Ruby for a web shop build in Rails for selling mobile phone credits. It was basically a translation of the PHP example given by the iDEAL organization (see iDEAL Advanced Integration Manual PHP). Is was released as the ideal-on-rails library.
 
-In 2007 this code was refactored as a patch for the ActiveMerchant library, this was mainly done by "Fingertips":http://www.fngtps.com/ for a client project. This patch was never accepted due to the fact it was too different (and maybe too obscure) from the 'normal' credit card gateways. 
+In 2007 this code was refactored as a patch for the ActiveMerchant library, this was mainly done by "Fingertips":http://www.fngtps.com/ for a client project. This patch was never accepted due to the fact it was too different (and maybe too obscure) from the 'normal' credit card gateways. After some lobbying an older patch of the code eventually found it's way into ActiveMerchant.
 
-In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway (presumable based on the first ActiveMerchant patch) to a new ideal branch. 
+In 2009 Fingertips forked the ActiveMerchant library and added an iDEAL gateway based on the ActiveMerchant path.
 
-In 2010 this code was extracted and converted into a separate gem, so it can be more easily used in combination with the latest version of ActiveMerchant. This library is just an extraction, nothing more and nothing less. There are no fundamental changes between the code from the ideal branch and the code of this gem. Later that year "Sernin van de Krol":http://github.com/paneidos added support for ABN AMRO. 
+In 2010 this code was extracted and converted into a separate gem by Frank Oxener of Agile Dovadi, so it can be more easily used in combination with the latest version of ActiveMerchant. This library was just an extraction, nothing more and nothing less. There were no fundamental changes between the code from the ideal branch and the code of this gem. Later that year "Sernin van de Krol":http://github.com/paneidos added support for ABN AMRO.
 
-h2. Maintainer
-
-This gem is maintained by "Agile Dovadi BV":http://dovadi.com, contact "Frank Oxener":mailto:frank@dovadi.com
+At the end of 2011 Fingertips made yet another fork of the code as the iDeal gem. They ripped out all ActiveMerchant and Rails dependencies. In 2012 ABN AMRO switched their backend and support for this was also added.
