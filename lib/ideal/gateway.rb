@@ -40,12 +40,7 @@ module Ideal
       attr_accessor :passphrase
 
       # Holds the test and production urls for your iDeal acquirer.
-      attr_accessor :live_url,             :test_url
-
-      # For ABN AMRO only assign the three separate directory, transaction and status urls.
-      attr_accessor :live_directory_url,   :test_directory_url
-      attr_accessor :live_transaction_url, :test_transaction_url
-      attr_accessor :live_status_url,      :test_status_url
+      attr_accessor :live_url, :test_url
     end
 
     # Environment defaults to test
@@ -119,11 +114,6 @@ module Ideal
       end
     end
 
-    # Returns true when the acquirer was set to :abnamro
-    def self.abn_amro?
-      acquirer.to_sym == :abnamro
-    end
-
     # Returns the merchant `subID' being used for this Gateway instance.
     # Defaults to 0.
     attr_reader :sub_id
@@ -135,11 +125,11 @@ module Ideal
       @sub_id = options[:sub_id] || 0
     end
 
-    # Returns the endpoint for a certain request.
+    # Returns the endpoint for the request.
     #
     # Automatically uses test or live URLs based on the configuration.
-    def request_url(request_type)
-      self.class.send("#{self.class.environment}#{request_url_prefix(request_type)}_url")
+    def request_url
+      self.class.send("#{self.class.environment}_url")
     end
 
     # Sends a directory request to the acquirer and returns an
@@ -148,7 +138,7 @@ module Ideal
     #
     #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
     def issuers
-      post_data request_url(:directory), build_directory_request_body, DirectoryResponse
+      post_data request_url, build_directory_request_body, DirectoryResponse
     end
 
     # Starts a purchase by sending an acquirer transaction request for the
@@ -196,7 +186,7 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def setup_purchase(money, options)
-      post_data request_url(:transaction), build_transaction_request_body(money, options), TransactionResponse
+      post_data request_url, build_transaction_request_body(money, options), TransactionResponse
     end
 
     # Sends a acquirer status request for the specified +transaction_id+ and
@@ -216,16 +206,10 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def capture(transaction_id)
-      post_data request_url(:status), build_status_request_body(:transaction_id => transaction_id), StatusResponse
+      post_data request_url, build_status_request_body(:transaction_id => transaction_id), StatusResponse
     end
 
     private
-
-    # Returns the prefix to locate the setting for a certain request type. Only applies
-    # in the case of ABN AMRO because they use more than one endpoint.
-    def request_url_prefix(request_type)
-      (request_type && self.class.abn_amro?) ? "_#{request_type.to_s}" : nil
-    end
 
     def ssl_post(url, body)
       response = REST.post(url, body, {}, {
@@ -260,7 +244,7 @@ module Ideal
     end
 
     def strip_whitespace(str)
-      self.class.abn_amro? ? str.gsub(/(\f|\n|\r|\t|\v)/m, '') : str.gsub(/\s/m,'')
+      str.gsub(/\s/m,'')
     end
 
     # Creates a +tokenCode+ from the specified +message+.
