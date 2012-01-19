@@ -212,11 +212,16 @@ module Ideal
     private
 
     def ssl_post(url, body)
-      response = REST.post(url, body, {}, {
+      log('URL', url)
+      log('Request', body)
+      response = REST.post(url, body, {
+        'Content-Type' => 'application/xml; charset=utf-8'
+      }, {
         :tls_verify      => true,
         :tls_key         => self.class.private_key,
         :tls_certificate => self.class.private_certificate
       })
+      log('Response', response.body)
       response.body
     end
 
@@ -404,6 +409,10 @@ module Ideal
           [:entrance_code,     options[:entrance_code]]
         ]]
       ])
+    end
+    
+    def log(thing, contents)
+      $stderr.write("\n#{thing}:\n\n#{contents}\n") if $DEBUG
     end
   end
 end
