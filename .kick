@@ -1,0 +1,5 @@
+recipe :ignore
+
+ignore(/^(pkg)/)
+
+recipe :ruby
