@@ -9,8 +9,10 @@ class IdealTest < Test::Unit::TestCase
 
     @gateway = Ideal::Gateway.new
 
+    @@issuer ||= @gateway.issuers.list[0]
+
     @valid_options = {
-      :issuer_id         => '0151',
+      :issuer_id         => @@issuer[:id],
       :expiration_period => 'PT10M',
       :return_url        => 'http://return_to.example.com',
       :order_id          => '123456789012',
@@ -59,7 +61,10 @@ class IdealTest < Test::Unit::TestCase
   #
 
   def test_retrieval_of_issuers
-    assert_equal [{ :id => '0151', :name => 'Issuer Simulator' }], @gateway.issuers.list
+    issuer_list = @gateway.issuers.list
+    assert_equal 1, issuer_list.length
+    assert_match /^Issuer\ Sim/, issuer_list[0][:name]
+    assert_match /^\d{4}$/, issuer_list[0][:id]
   end
 
   def test_successful_transaction
