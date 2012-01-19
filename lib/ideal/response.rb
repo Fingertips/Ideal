@@ -196,7 +196,7 @@ module Ideal
     # Returns whether or not the authenticity of the message could be
     # verified.
     def verified?
-      @verified ||= Gateway.ideal_certificate.public_key.
+      @verified ||= Ideal::Gateway.ideal_certificate.public_key.
                       verify(OpenSSL::Digest::SHA1.new, signature, message)
     end
 
