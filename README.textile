@@ -114,15 +114,15 @@ unless Rails.env.production?
 end
 
 # Other banks preloaded are :abnamro and :rabobank
-Ideal::Gateway::IdealGateway.acquirer = :ing 
-Ideal::Gateway::IdealGateway.merchant_id = '00123456789'
+Ideal::Gateway.acquirer = :ing 
+Ideal::Gateway.merchant_id = '00123456789'
 
 # Maybe you'd like another location
 ideal_directory = Rails.root + 'config/ideal'
-Ideal::Gateway::IdealGateway.passphrase = 'the_passphrase'
-Ideal::Gateway::IdealGateway.private_key_file         = ideal_directory + 'private_key.pem'
-Ideal::Gateway::IdealGateway.private_certificate_file = ideal_directory + 'private_certificate.cer'
-Ideal::Gateway::IdealGateway.ideal_certificate_file   = ideal_directory + 'ideal.cer'
+Ideal::Gateway.passphrase = 'the_passphrase'
+Ideal::Gateway.private_key_file         = ideal_directory + 'private_key.pem'
+Ideal::Gateway.private_certificate_file = ideal_directory + 'private_certificate.cer'
+Ideal::Gateway.ideal_certificate_file   = ideal_directory + 'ideal.cer'
 </pre>
 
 h3. Show a payment form
