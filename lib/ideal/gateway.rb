@@ -258,7 +258,7 @@ module Ideal
             xml.DigestValue digest_val
           end
         end
-        xml.SignatureValue signature_value(xml)
+        xml.SignatureValue signature_value(digest_val)
         xml.KeyInfo do |xml|
           xml.KeyName fingerprint
         end
@@ -266,10 +266,8 @@ module Ideal
     end
 
     # Creates a +signatureValue+ from the xml+.
-    def signature_value(xml)
-      signed_info = xml.doc.at_xpath('//xmlns:SignedInfo', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#')
-      canonical = signed_info.canonicalize(Nokogiri::XML::XML_C14N_EXCLUSIVE_1_0)
-      signature = self.class.private_key.sign(OpenSSL::Digest::SHA256.new, canonical)
+    def signature_value(digest_value)
+      signature = Ideal::Gateway.private_key.sign(OpenSSL::Digest::SHA256.new, digest_value)
       strip_whitespace(Base64.encode64(strip_whitespace(signature)))
     end
     
@@ -282,7 +280,7 @@ module Ideal
     
     # Creates a keyName value for the XML signature
     def fingerprint
-      Digest::SHA1.hexdigest(self.class.private_certificate.to_der).upcase
+      Digest::SHA1.hexdigest(Ideal::Gateway.private_certificate.to_der).upcase
     end
 
     # Returns a string containing the current UTC time, formatted as per the

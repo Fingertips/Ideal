@@ -125,16 +125,8 @@ module IdealTestCases
     def test_signature_value_generation
       sha256 = OpenSSL::Digest::SHA256.new
       OpenSSL::Digest::SHA256.stubs(:new).returns(sha256)
-      xml = Nokogiri::XML::Builder.new do |xml|
-        xml.request do |xml|
-          xml.content 'signature test'
-          @gateway.send(:sign!, xml)
-        end
-      end
-      signature_value = xml.doc.at_xpath('//xmlns:SignatureValue', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#').text
-      signed_info = xml.doc.at_xpath('//xmlns:SignedInfo', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#')
-      canonical = signed_info.canonicalize(Nokogiri::XML::XML_C14N_EXCLUSIVE_1_0)
-      signature = Ideal::Gateway.private_key.sign(sha256, canonical)
+      signature_value = @gateway.send(:signature_value, 'foo')
+      signature = Ideal::Gateway.private_key.sign(sha256, 'foo')
       expected_signature_value = strip_whitespace(Base64.encode64(strip_whitespace(signature)))
       assert_equal expected_signature_value, signature_value
     end
