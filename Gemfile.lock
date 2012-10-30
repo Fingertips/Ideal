@@ -8,6 +8,7 @@ PATH
 GEM
   remote: http://rubygems.org/
   specs:
+    activesupport (3.0.0)
     metaclass (0.0.1)
     mocha (0.10.0)
       metaclass (~> 0.0.1)
@@ -19,6 +20,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  activesupport
   ideal!
   mocha
   rake
