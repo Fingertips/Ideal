@@ -103,32 +103,7 @@ module IdealTestCases
       assert_equal timestamp, @gateway.send(:created_at_timestamp)
     end
 
-    def test_ruby_to_java_keys_conversion
-      keys = [
-        [:acquirer_transaction_request, 'AcquirerTrxReq'],
-        [:acquirer_status_request,      'AcquirerStatusReq'],
-        [:directory_request,            'DirectoryReq'],
-        [:created_at,                   'createDateTimeStamp'],
-        [:issuer,                       'Issuer'],
-        [:merchant,                     'Merchant'],
-        [:transaction,                  'Transaction'],
-        [:issuer_id,                    'issuerID'],
-        [:merchant_id,                  'merchantID'],
-        [:sub_id,                       'subID'],
-        [:token_code,                   'tokenCode'],
-        [:merchant_return_url,          'merchantReturnURL'],
-        [:purchase_id,                  'purchaseID'],
-        [:expiration_period,            'expirationPeriod'],
-        [:entrance_code,                'entranceCode']
-      ]
-
-      keys.each do |key, expected_key|
-        assert_equal expected_key, @gateway.send(:javaize_key, key)
       end
-    end
-
-    def test_does_not_convert_unknown_key_to_java_key
-      assert_equal 'not_a_registered_key', @gateway.send(:javaize_key, :not_a_registered_key)
     end
 
     def test_token_generation
@@ -168,27 +143,6 @@ module IdealTestCases
   class XMLBuildingTest < Test::Unit::TestCase
     def setup
       @gateway = Ideal::Gateway.new
-    end
-
-    def test_contains_correct_info_in_root_node
-      expected_xml = Builder::XmlMarkup.new
-      expected_xml.instruct!
-      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => Ideal::Gateway::XML_NAMESPACE, 'version' => Ideal::Gateway::API_VERSION) {}
-
-      assert_equal expected_xml.target!, @gateway.send(:xml_for, :acquirer_transaction_request, [])
-    end
-
-    def test_creates_correct_xml_with_java_keys_from_array_with_ruby_keys
-      expected_xml = Builder::XmlMarkup.new
-      expected_xml.instruct!
-      expected_xml.tag!('AcquirerTrxReq', 'xmlns' => Ideal::Gateway::XML_NAMESPACE, 'version' => Ideal::Gateway::API_VERSION) do
-        expected_xml.tag!('a_parent') do
-          expected_xml.tag!('createDateTimeStamp', '2009-01-26')
-        end
-      end
-
-      assert_equal expected_xml.target!, @gateway.send(:xml_for, :acquirer_transaction_request, [[:a_parent, [[:created_at, '2009-01-26']]]])
-    end
   end
 
   class RequestBodyBuildingTest < Test::Unit::TestCase
@@ -200,17 +154,7 @@ module IdealTestCases
       @gateway.stubs(:token_code)
 
       @transaction_id = '0001023456789112'
-    end
 
-    def test_build_transaction_request_body_raises_ArgumentError_with_missing_required_options
-      options = VALID_PURCHASE_OPTIONS.dup
-      options.keys.each do |key|
-        options.delete(key)
-
-        assert_raise(ArgumentError) do
-          @gateway.send(:build_transaction_request_body, 100, options)
-        end
-      end
     end
 
     def test_valid_with_valid_options
@@ -250,97 +194,10 @@ module IdealTestCases
         end
       end
     end
-
-    def test_builds_a_transaction_request_body
-      money = 4321
-
-      message = 'created_at_timestamp' +
-                VALID_PURCHASE_OPTIONS[:issuer_id] +
-                Ideal::Gateway.merchant_id +
-                @gateway.sub_id.to_s +
-                VALID_PURCHASE_OPTIONS[:return_url] +
-                VALID_PURCHASE_OPTIONS[:order_id] +
-                money.to_s +
-                Ideal::Gateway::CURRENCY +
-                Ideal::Gateway::LANGUAGE +
-                VALID_PURCHASE_OPTIONS[:description] +
-                VALID_PURCHASE_OPTIONS[:entrance_code]
-
-      @gateway.expects(:token_code).with(message).returns('the_token_code')
-
-      @gateway.expects(:xml_for).with(:acquirer_transaction_request, [
-        [:created_at, 'created_at_timestamp'],
-        [:issuer, [[:issuer_id, VALID_PURCHASE_OPTIONS[:issuer_id]]]],
-
-        [:merchant, [
-          [:merchant_id,         Ideal::Gateway.merchant_id],
-          [:sub_id,              @gateway.sub_id],
-          [:authentication,      Ideal::Gateway::AUTHENTICATION_TYPE],
-          [:token,               'the_token'],
-          [:token_code,          'the_token_code'],
-          [:merchant_return_url, VALID_PURCHASE_OPTIONS[:return_url]]
-        ]],
-
-        [:transaction, [
-          [:purchase_id,       VALID_PURCHASE_OPTIONS[:order_id]],
-          [:amount,            money],
-          [:currency,          Ideal::Gateway::CURRENCY],
-          [:expiration_period, VALID_PURCHASE_OPTIONS[:expiration_period]],
-          [:language,          Ideal::Gateway::LANGUAGE],
-          [:description,       VALID_PURCHASE_OPTIONS[:description]],
-          [:entrance_code,     VALID_PURCHASE_OPTIONS[:entrance_code]]
-        ]]
-      ])
-
-      @gateway.send(:build_transaction_request_body, money, VALID_PURCHASE_OPTIONS)
-    end
-
-    def test_builds_a_directory_request_body
-      message = 'created_at_timestamp' + Ideal::Gateway.merchant_id + @gateway.sub_id.to_s
-      @gateway.expects(:token_code).with(message).returns('the_token_code')
-
-      @gateway.expects(:xml_for).with(:directory_request, [
-        [:created_at, 'created_at_timestamp'],
-        [:merchant, [
-          [:merchant_id,    Ideal::Gateway.merchant_id],
-          [:sub_id,         @gateway.sub_id],
-          [:authentication, Ideal::Gateway::AUTHENTICATION_TYPE],
-          [:token,          'the_token'],
-          [:token_code,     'the_token_code']
-        ]]
-      ])
-
-      @gateway.send(:build_directory_request_body)
-    end
-
     def test_builds_a_status_request_body_raises_ArgumentError_with_missing_required_options
       assert_raise(ArgumentError) do
         @gateway.send(:build_status_request_body, {})
       end
-    end
-
-    def test_builds_a_status_request_body
-      options = { :transaction_id => @transaction_id }
-
-      message = 'created_at_timestamp' + Ideal::Gateway.merchant_id + @gateway.sub_id.to_s + options[:transaction_id]
-      @gateway.expects(:token_code).with(message).returns('the_token_code')
-
-      @gateway.expects(:xml_for).with(:acquirer_status_request, [
-        [:created_at, 'created_at_timestamp'],
-        [:merchant, [
-          [:merchant_id,    Ideal::Gateway.merchant_id],
-          [:sub_id,         @gateway.sub_id],
-          [:authentication, Ideal::Gateway::AUTHENTICATION_TYPE],
-          [:token,          'the_token'],
-          [:token_code,     'the_token_code']
-        ]],
-
-        [:transaction, [
-          [:transaction_id, options[:transaction_id]]
-        ]],
-      ])
-
-      @gateway.send(:build_status_request_body, options)
     end
   end
 

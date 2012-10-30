@@ -264,62 +264,6 @@ module Ideal
       Time.now.gmtime.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     end
 
-    def camelize(lower_case_and_underscored_word, first_letter_in_uppercase = true)
-      if first_letter_in_uppercase
-        lower_case_and_underscored_word.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
-      else
-        lower_case_and_underscored_word.to_s[0].chr.downcase + camelize(lower_case_and_underscored_word)[1..-1]
-      end
-    end
-
-    # iDeal doesn't really seem to care about nice looking keys in their XML.
-    # Probably some Java XML class, hence the method name.
-    def javaize_key(key)
-      key = key.to_s
-      case key
-      when 'acquirer_transaction_request'
-        'AcquirerTrxReq'
-      when 'acquirer_status_request'
-        'AcquirerStatusReq'
-      when 'directory_request'
-        'DirectoryReq'
-      when 'issuer', 'merchant', 'transaction'
-        key.capitalize
-      when 'created_at'
-        'createDateTimeStamp'
-      when 'merchant_return_url'
-        'merchantReturnURL'
-      when 'token_code', 'expiration_period', 'entrance_code'
-        key[0,1] + camelize(key)[1..-1]
-      when /^(\w+)_id$/
-        "#{$1}ID"
-      else
-        key
-      end
-    end
-
-    # Creates xml with a given hash of tag-value pairs according to the iDeal
-    # requirements.
-    def xml_for(name, tags_and_values)
-      xml = Builder::XmlMarkup.new
-      xml.instruct!
-      xml.tag!(javaize_key(name), 'xmlns' => XML_NAMESPACE, 'version' => API_VERSION) { xml_from_array(xml, tags_and_values) }
-      xml.target!
-    end
-
-    # Recursively creates xml for a given hash of tag-value pair. Uses
-    # javaize_key on the tags to create the tags needed by iDeal.
-    def xml_from_array(builder, tags_and_values)
-      tags_and_values.each do |tag, value|
-        tag = javaize_key(tag)
-        if value.is_a?(Array)
-          builder.tag!(tag) { xml_from_array(builder, value) }
-        else
-          builder.tag!(tag, value)
-        end
-      end
-    end
-
     def requires!(options, *keys)
       missing = keys - options.keys
       unless missing.empty?
@@ -331,38 +275,10 @@ module Ideal
       requires!(options, :transaction_id)
 
       timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}#{options[:transaction_id]}"
-
-      xml_for(:acquirer_status_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]],
-
-        [:transaction, [
-          [:transaction_id, options[:transaction_id]]
-        ]]
-      ])
     end
 
     def build_directory_request_body
       timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}"
-
-      xml_for(:directory_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]]
-      ])
     end
 
     def build_transaction_request_body(money, options)
@@ -374,41 +290,6 @@ module Ideal
       enforce_maximum_length(:entrance_code, options[:entrance_code], 40)
 
       timestamp = created_at_timestamp
-      message = timestamp +
-                options[:issuer_id] +
-                self.class.merchant_id +
-                @sub_id.to_s +
-                options[:return_url] +
-                options[:order_id] +
-                money.to_s +
-                CURRENCY +
-                LANGUAGE +
-                options[:description] +
-                options[:entrance_code]
-
-      xml_for(:acquirer_transaction_request, [
-        [:created_at, timestamp],
-        [:issuer, [[:issuer_id, options[:issuer_id]]]],
-
-        [:merchant, [
-          [:merchant_id,         self.class.merchant_id],
-          [:sub_id,              @sub_id],
-          [:authentication,      AUTHENTICATION_TYPE],
-          [:token,               token],
-          [:token_code,          token_code(message)],
-          [:merchant_return_url, options[:return_url]]
-        ]],
-
-        [:transaction, [
-          [:purchase_id,       options[:order_id]],
-          [:amount,            money],
-          [:currency,          CURRENCY],
-          [:expiration_period, options[:expiration_period]],
-          [:language,          LANGUAGE],
-          [:description,       options[:description]],
-          [:entrance_code,     options[:entrance_code]]
-        ]]
-      ])
     end
     
     def log(thing, contents)
