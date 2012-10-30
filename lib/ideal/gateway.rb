@@ -137,7 +137,7 @@ module Ideal
     #
     #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
     def issuers
-      post_data request_url, build_directory_request_body, DirectoryResponse
+      post_data request_url, build_directory_request, DirectoryResponse
     end
 
     # Starts a purchase by sending an acquirer transaction request for the
@@ -185,7 +185,7 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def setup_purchase(money, options)
-      post_data request_url, build_transaction_request_body(money, options), TransactionResponse
+      post_data request_url, build_transaction_request(money, options), TransactionResponse
     end
 
     # Sends a acquirer status request for the specified +transaction_id+ and
@@ -205,7 +205,7 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def capture(transaction_id)
-      post_data request_url, build_status_request_body(:transaction_id => transaction_id), StatusResponse
+      post_data request_url, build_status_request(:transaction_id => transaction_id), StatusResponse
     end
 
     private

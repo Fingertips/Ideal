@@ -353,7 +353,7 @@ module IdealTestCases
     end
 
     def test_returns_a_list_with_only_one_issuer
-      @gateway.stubs(:build_directory_request_body).returns('the request body')
+      @gateway.stubs(:build_directory_request).returns('the request body')
       @gateway.expects(:ssl_post).with(@gateway.request_url, 'the request body').returns(DIRECTORY_RESPONSE_WITH_ONE_ISSUER)
 
       expected_issuers = [{ :id => '1006', :name => 'ABN AMRO Bank' }]
@@ -364,7 +364,7 @@ module IdealTestCases
     end
 
     def test_returns_list_of_issuers_from_response
-      @gateway.stubs(:build_directory_request_body).returns('the request body')
+      @gateway.stubs(:build_directory_request).returns('the request body')
       @gateway.expects(:ssl_post).with(@gateway.request_url, 'the request body').returns(DIRECTORY_RESPONSE_WITH_MULTIPLE_ISSUERS)
 
       expected_issuers = [
@@ -385,7 +385,7 @@ module IdealTestCases
     def setup
       @gateway = Ideal::Gateway.new
 
-      @gateway.stubs(:build_transaction_request_body).with(4321, VALID_PURCHASE_OPTIONS).returns('the request body')
+      @gateway.stubs(:build_transaction_request).with(4321, VALID_PURCHASE_OPTIONS).returns('the request body')
       @gateway.expects(:ssl_post).with(@gateway.request_url, 'the request body').returns(ACQUIRER_TRANSACTION_RESPONSE)
 
       @setup_purchase_response = @gateway.setup_purchase(4321, VALID_PURCHASE_OPTIONS)
@@ -409,7 +409,7 @@ module IdealTestCases
     def setup
       @gateway = Ideal::Gateway.new
 
-      @gateway.stubs(:build_status_request_body).
+      @gateway.stubs(:build_status_request).
         with(:transaction_id => '0001023456789112').returns('the request body')
     end
 
