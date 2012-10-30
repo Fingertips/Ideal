@@ -15,7 +15,11 @@ module Test
       HOME_DIR = RUBY_PLATFORM =~ /mswin32/ ? ENV['HOMEPATH'] : ENV['HOME'] unless defined?(HOME_DIR)
       LOCAL_CREDENTIALS = File.join(HOME_DIR.to_s, '.ideal/fixtures.yml') unless defined?(LOCAL_CREDENTIALS)
       DEFAULT_CREDENTIALS = File.join(File.dirname(__FILE__), 'fixtures.yml') unless defined?(DEFAULT_CREDENTIALS)
-
+      
+      def strip_whitespace(str)
+        str.gsub(/\s/m,'')
+      end
+      
       private
 
       def all_fixtures

@@ -6,7 +6,7 @@ module IdealTestCases
   # This method is called at the end of the file when all fixture data has been loaded.
   def self.setup_ideal_gateway!
     Ideal::Gateway.class_eval do
-      self.acquirer = :ing
+      self.acquirer = :rabobank
 
       self.merchant_id = '123456789'
 
@@ -18,13 +18,14 @@ module IdealTestCases
   end
 
   VALID_PURCHASE_OPTIONS = {
-    :issuer_id         => '0001',
+    :issuer_id         => '99999IBAN',
     :expiration_period => 'PT10M',
     :return_url        => 'http://return_to.example.com',
     :order_id          => '12345678901',
     :description       => 'A classic Dutch windmill',
     :entrance_code     => '1234'
   }
+  
 
   class ClassMethodsTest < Test::Unit::TestCase
     def test_merchant_id
@@ -38,7 +39,7 @@ module IdealTestCases
 
     def test_verify_live_url_for_rabobank
       Ideal::Gateway.acquirer = :rabobank
-      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', Ideal::Gateway.live_url
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDealv3', Ideal::Gateway.live_url
     end
 
     def test_verify_live_urls_for_abnamro
@@ -53,7 +54,7 @@ module IdealTestCases
     end
 
     def test_acquirers
-      assert_equal 'https://ideal.rabobank.nl/ideal/iDeal', Ideal::Gateway.acquirers['rabobank']['live_url']
+      assert_equal 'https://ideal.rabobank.nl/ideal/iDealv3', Ideal::Gateway.acquirers['rabobank']['live_url']
       assert_equal 'https://ideal.secure-ing.com/ideal/iDeal', Ideal::Gateway.acquirers['ing']['live_url']
       assert_equal 'https://abnamro.ideal-payment.de/ideal/iDeal', Ideal::Gateway.acquirers['abnamro']['live_url']
     end
@@ -103,27 +104,60 @@ module IdealTestCases
       assert_equal timestamp, @gateway.send(:created_at_timestamp)
     end
 
+    def test_digest_value_generation
+      sha256 = OpenSSL::Digest::SHA256.new
+      OpenSSL::Digest::SHA256.stubs(:new).returns(sha256)
+      xml = Nokogiri::XML::Builder.new do |xml|
+        xml.request do |xml|
+          xml.content 'digest test'
+          @gateway.send(:sign!, xml)
+        end
       end
+      digest_value = xml.doc.at_xpath('//xmlns:DigestValue', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#').text
+      xml.doc.at_xpath('//xmlns:Signature', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#').remove
+      canonical = xml.doc.canonicalize(Nokogiri::XML::XML_C14N_EXCLUSIVE_1_0)
+      digest = sha256.digest canonical
+      expected_digest_value = strip_whitespace(Base64.encode64(strip_whitespace(digest)))
+      assert_equal expected_digest_value, digest_value
     end
 
-    def test_token_generation
+
+    def test_signature_value_generation
+      sha256 = OpenSSL::Digest::SHA256.new
+      OpenSSL::Digest::SHA256.stubs(:new).returns(sha256)
+      xml = Nokogiri::XML::Builder.new do |xml|
+        xml.request do |xml|
+          xml.content 'signature test'
+          @gateway.send(:sign!, xml)
+        end
+      end
+      signature_value = xml.doc.at_xpath('//xmlns:SignatureValue', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#').text
+      signed_info = xml.doc.at_xpath('//xmlns:SignedInfo', 'xmlns' => 'http://www.w3.org/2000/09/xmldsig#')
+      canonical = signed_info.canonicalize(Nokogiri::XML::XML_C14N_EXCLUSIVE_1_0)
+      signature = Ideal::Gateway.private_key.sign(sha256, canonical)
+      expected_signature_value = strip_whitespace(Base64.encode64(strip_whitespace(signature)))
+      assert_equal expected_signature_value, signature_value
+    end
+
+    def test_key_name_generation
       expected_token = Digest::SHA1.hexdigest(OpenSSL::X509::Certificate.new(PRIVATE_CERTIFICATE).to_der).upcase
-      assert_equal expected_token, @gateway.send(:token)
+      assert_equal expected_token, @gateway.send(:fingerprint)
     end
 
-    def test_token_code_generation
-      Ideal::Gateway.acquirer = :ing
-      message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
-      stripped_message = message.gsub(/\s/m, '')
 
-      sha1 = OpenSSL::Digest::SHA1.new
-      OpenSSL::Digest::SHA1.stubs(:new).returns(sha1)
-
-      signature = Ideal::Gateway.private_key.sign(sha1, stripped_message)
-      encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
-
-      assert_equal encoded_signature, @gateway.send(:token_code, message)
-    end
+    # def test_token_code_generation
+    #   Ideal::Gateway.acquirer = :ing
+    #   message = "Top\tsecret\tman.\nI could tell you, but then I'd have to kill you…"
+    #   stripped_message = message.gsub(/\s/m, '')
+    # 
+    #   sha1 = OpenSSL::Digest::SHA1.new
+    #   OpenSSL::Digest::SHA1.stubs(:new).returns(sha1)
+    # 
+    #   signature = Ideal::Gateway.private_key.sign(sha1, stripped_message)
+    #   encoded_signature = Base64.encode64(signature).strip.gsub(/\n/, '')
+    # 
+    #   assert_equal encoded_signature, @gateway.send(:token_code, message)
+    # end
 
     def test_posts_data_with_ssl_to_request_url_and_return_the_correct_response_for_test
       Ideal::Gateway.environment = :test
@@ -143,29 +177,63 @@ module IdealTestCases
   class XMLBuildingTest < Test::Unit::TestCase
     def setup
       @gateway = Ideal::Gateway.new
+      @gateway.stubs(:created_at_timestamp).returns('created_at_timestamp')
+      @gateway.stubs(:digest_value).returns('digest_value')
+      @gateway.stubs(:signature_value).returns('signature_value')
+      @gateway.stubs(:fingerprint).returns('fingerprint')
+    end
+
+    def test_transaction_request_xml
+      options = {
+        issuer_id: 'issuer_id',
+        return_url: 'return_url',
+        order_id: 'purchase_id',
+        expiration_period: 'expiration_period',
+        description: 'description',
+        entrance_code: 'entrance_code'
+      }
+      xml = @gateway.send(:build_transaction_request, 'amount', options)
+      assert_equal xml, TRANSACTION_REQUEST
+    end
+    
+    def test_status_request_xml
+      options = {
+        transaction_id: 'transaction_id',
+      }
+      xml = @gateway.send(:build_status_request, options)
+      assert_equal xml, STATUS_REQUEST
+    end
+    
+    def test_directory_request_xml
+      xml = @gateway.send(:build_directory_request)
+      assert_equal xml, DIRECTORY_REQUEST
+    end
+    
+ 
   end
 
-  class RequestBodyBuildingTest < Test::Unit::TestCase
+  class ErroneousInputTest < Test::Unit::TestCase
+  
     def setup
       @gateway = Ideal::Gateway.new
-
       @gateway.stubs(:created_at_timestamp).returns('created_at_timestamp')
-      @gateway.stubs(:token).returns('the_token')
-      @gateway.stubs(:token_code)
-
+      @gateway.stubs(:digest_value).returns('digest_value')
+      @gateway.stubs(:signature_value).returns('signature_value')
+      @gateway.stubs(:fingerprint).returns('fingerprint')
+      
       @transaction_id = '0001023456789112'
 
     end
-
+    
     def test_valid_with_valid_options
-      assert_not_nil @gateway.send(:build_transaction_request_body, 4321, VALID_PURCHASE_OPTIONS)
+      assert_not_nil @gateway.send(:build_transaction_request, 4321, VALID_PURCHASE_OPTIONS)
     end
-
+    
     def test_checks_that_fields_are_not_too_long
       assert_raise ArgumentError do
-        @gateway.send(:build_transaction_request_body, 1234567890123, VALID_PURCHASE_OPTIONS) # 13 chars
+        @gateway.send(:build_transaction_request, 1234567890123, VALID_PURCHASE_OPTIONS) # 13 chars
       end
-
+    
       [
         [:order_id, '12345678901234567'], # 17 chars,
         [:description, '123456789012345678901234567890123'], # 33 chars
@@ -173,32 +241,45 @@ module IdealTestCases
       ].each do |key, value|
         options = VALID_PURCHASE_OPTIONS.dup
         options[key] = value
-
+    
         assert_raise ArgumentError do
-          @gateway.send(:build_transaction_request_body, 4321, options)
+          @gateway.send(:build_transaction_request, 4321, options)
         end
       end
     end
-
+  
+    def test_build_transaction_request_body_raises_ArgumentError_with_missing_required_options
+      options = VALID_PURCHASE_OPTIONS.dup
+      options.keys.each do |key|
+        options.delete(key)
+  
+        assert_raise(ArgumentError) do
+          @gateway.send(:build_transaction_request, 100, options)
+        end
+      end
+    end
+  
     def test_checks_that_fields_do_not_contain_diacritical_characters
       assert_raise ArgumentError do
-        @gateway.send(:build_transaction_request_body, 'graphème', VALID_PURCHASE_OPTIONS)
+        @gateway.send(:build_transaction_request, 'graphème', VALID_PURCHASE_OPTIONS)
       end
-
+  
       [:order_id, :description, :entrance_code].each do |key, value|
         options = VALID_PURCHASE_OPTIONS.dup
         options[key] = 'graphème'
-
+  
         assert_raise ArgumentError do
-          @gateway.send(:build_transaction_request_body, 4321, options)
+          @gateway.send(:build_transaction_request, 4321, options)
         end
       end
     end
+    
     def test_builds_a_status_request_body_raises_ArgumentError_with_missing_required_options
       assert_raise(ArgumentError) do
-        @gateway.send(:build_status_request_body, {})
+        @gateway.send(:build_status_request, {})
       end
     end
+    
   end
 
   class GeneralResponseTest < Test::Unit::TestCase
@@ -595,5 +676,101 @@ ilZjTJIlLOkXk6uE8vQGjZy0BUnjNPkXOQGkTyj4jDxZ2z+z9Vy8BwfothdcYbZK
   </Error>
 </ErrorRes>}
 
+  TRANSACTION_REQUEST =  @transaction_xml = %{<?xml version="1.0" encoding="UTF-8"?>
+<AcquirerTrxReq xmlns="http://www.idealdesk.com/ideal/messages/mer-acq/3.3.1" version="3.3.1">
+  <createDateTimestamp>created_at_timestamp</createDateTimestamp>
+  <Issuer>
+    <issuerID>issuer_id</issuerID>
+  </Issuer>
+  <Merchant>
+    <merchantID>123456789</merchantID>
+    <subID>0</subID>
+    <merchantReturnURL>return_url</merchantReturnURL>
+  </Merchant>
+  <Transaction>
+    <purchaseID>purchase_id</purchaseID>
+    <amount>amount</amount>
+    <currency>EUR</currency>
+    <expirationPeriod>expiration_period</expirationPeriod>
+    <language>nl</language>
+    <description>description</description>
+    <entranceCode>entrance_code</entranceCode>
+  </Transaction>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <Reference URI="">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <DigestValue>digest_value</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>signature_value</SignatureValue>
+    <KeyInfo>
+      <KeyName>fingerprint</KeyName>
+    </KeyInfo>
+  </Signature>
+</AcquirerTrxReq>
+}
+
+  DIRECTORY_REQUEST = %{<?xml version="1.0" encoding="UTF-8"?>
+<DirectoryReq xmlns="http://www.idealdesk.com/ideal/messages/mer-acq/3.3.1" version="3.3.1">
+  <createDateTimestamp>created_at_timestamp</createDateTimestamp>
+  <Merchant>
+    <merchantID>123456789</merchantID>
+    <subID>0</subID>
+  </Merchant>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <Reference URI="">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <DigestValue>digest_value</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>signature_value</SignatureValue>
+    <KeyInfo>
+      <KeyName>fingerprint</KeyName>
+    </KeyInfo>
+  </Signature>
+</DirectoryReq>
+}
+
+  STATUS_REQUEST = %{<?xml version="1.0" encoding="UTF-8"?>
+<AcquirerStatusReq xmlns="http://www.idealdesk.com/ideal/messages/mer-acq/3.3.1" version="3.3.1">
+  <createDateTimestamp>created_at_timestamp</createDateTimestamp>
+  <Merchant>
+    <merchantID>123456789</merchantID>
+    <subID>0</subID>
+  </Merchant>
+  <Transaction>
+    <transactionID>transaction_id</transactionID>
+  </Transaction>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    <SignedInfo>
+      <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+      <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+      <Reference URI="">
+        <Transforms>
+          <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+        </Transforms>
+        <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+        <DigestValue>digest_value</DigestValue>
+      </Reference>
+    </SignedInfo>
+    <SignatureValue>signature_value</SignatureValue>
+    <KeyInfo>
+      <KeyName>fingerprint</KeyName>
+    </KeyInfo>
+  </Signature>
+</AcquirerStatusReq>
+}
   setup_ideal_gateway!
 end
