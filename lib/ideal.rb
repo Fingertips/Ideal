@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-require 'builder'
+require 'nokogiri'
 require 'rest'
 
 require 'ideal/acquirers'
