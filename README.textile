@@ -19,8 +19,10 @@ In order to use iDEAL you will need to get an iDEAL merchant account from your b
   * ING/Postbank: iDEAL Advanced
   * ABN AMRO: iDEAL Zelfbouw
   * Fortis: ? (Unknown)
-  * Rabobank: Rabo iDEAL Professional. (Unverified)
+  * Rabobank: Rabo iDEAL Professional.
   * SNS Bank: "Not yet available":http://www.snsbank.nl/zakelijk/betalingsverkeer/kan-ik-ideal-gebruiken-voor-mijn-webwinkel.html
+
+Note that this implementation was started a few years ago. As a result we only support version 2 or the iDEAL protocol, in some cases it might be necessary to configure this in your iDEAL backend or use a different set of API credentials.
 
 h2. Install
 
