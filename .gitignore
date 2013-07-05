@@ -17,5 +17,8 @@ tmtags
 coverage
 rdoc
 pkg
+vendor
+.bundle
+.ideal
 
 ## PROJECT::SPECIFIC

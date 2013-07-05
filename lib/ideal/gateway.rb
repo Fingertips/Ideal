@@ -3,7 +3,7 @@
 require 'openssl'
 require 'net/https'
 require 'base64'
-require 'digest/sha1'
+require 'digest/sha2'
 
 module Ideal
   # === Response classes
@@ -15,11 +15,10 @@ module Ideal
   # 
   # See the Response class for more information on errors.
   class Gateway
-    AUTHENTICATION_TYPE = 'SHA1_RSA'
     LANGUAGE = 'nl'
     CURRENCY = 'EUR'
-    API_VERSION = '1.1.0'
-    XML_NAMESPACE = 'http://www.idealdesk.com/Message'
+    API_VERSION = '3.3.1'
+    XML_NAMESPACE = 'http://www.idealdesk.com/ideal/messages/mer-acq/3.3.1'
 
     def self.acquirers
       Ideal::ACQUIRERS
@@ -138,7 +137,7 @@ module Ideal
     #
     #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
     def issuers
-      post_data request_url, build_directory_request_body, DirectoryResponse
+      post_data request_url, build_directory_request, DirectoryResponse
     end
 
     # Starts a purchase by sending an acquirer transaction request for the
@@ -186,7 +185,7 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def setup_purchase(money, options)
-      post_data request_url, build_transaction_request_body(money, options), TransactionResponse
+      post_data request_url, build_transaction_request(money, options), TransactionResponse
     end
 
     # Sends a acquirer status request for the specified +transaction_id+ and
@@ -206,7 +205,7 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def capture(transaction_id)
-      post_data request_url, build_status_request_body(:transaction_id => transaction_id), StatusResponse
+      post_data request_url, build_status_request(:transaction_id => transaction_id), StatusResponse
     end
 
     private
@@ -240,84 +239,54 @@ module Ideal
       raise ArgumentError, "The value for `#{key}' contains diacritical characters `#{string}'." if string =~ DIACRITICAL_CHARACTERS
     end
 
-    # Returns the +token+ as specified in section 2.8.4 of the iDeal specs.
-    #
-    # This is the params['AcquirerStatusRes']['Signature']['fingerprint'] in
-    # a StatusResponse instance.
-    def token
-      Digest::SHA1.hexdigest(self.class.private_certificate.to_der).upcase
-    end
-
     def strip_whitespace(str)
       str.gsub(/\s/m,'')
     end
+    
+    #signs the xml
+    def sign!(xml)
+      digest_val = digest_value(xml)
+      xml.Signature(xmlns: 'http://www.w3.org/2000/09/xmldsig#') do |xml|
+        xml.SignedInfo do |xml|
+          xml.CanonicalizationMethod(Algorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#')
+          xml.SignatureMethod(Algorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256')
+          xml.Reference(URI: '') do |xml|
+            xml.Transforms do |xml|
+              xml.Transform(Algorithm: 'http://www.w3.org/2000/09/xmldsig#enveloped-signature')
+            end
+            xml.DigestMethod(Algorithm: 'http://www.w3.org/2001/04/xmlenc#sha256')
+            xml.DigestValue digest_val
+          end
+        end
+        xml.SignatureValue signature_value(digest_val)
+        xml.KeyInfo do |xml|
+          xml.KeyName fingerprint
+        end
+      end
+    end
 
-    # Creates a +tokenCode+ from the specified +message+.
-    def token_code(message)
-      signature = self.class.private_key.sign(OpenSSL::Digest::SHA1.new, strip_whitespace(message))
-      strip_whitespace(Base64.encode64(signature))
+    # Creates a +signatureValue+ from the xml+.
+    def signature_value(digest_value)
+      signature = Ideal::Gateway.private_key.sign(OpenSSL::Digest::SHA256.new, digest_value)
+      strip_whitespace(Base64.encode64(strip_whitespace(signature)))
+    end
+    
+    # Creates a +digestValue+ from the xml+.
+    def digest_value(xml)
+      canonical = xml.doc.canonicalize(Nokogiri::XML::XML_C14N_EXCLUSIVE_1_0)
+      digest = OpenSSL::Digest::SHA256.new.digest canonical
+      strip_whitespace(Base64.encode64(strip_whitespace(digest)))
+    end
+    
+    # Creates a keyName value for the XML signature
+    def fingerprint
+      Digest::SHA1.hexdigest(Ideal::Gateway.private_certificate.to_der).upcase
     end
 
     # Returns a string containing the current UTC time, formatted as per the
     # iDeal specifications, except we don't use miliseconds.
     def created_at_timestamp
       Time.now.gmtime.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    end
-
-    def camelize(lower_case_and_underscored_word, first_letter_in_uppercase = true)
-      if first_letter_in_uppercase
-        lower_case_and_underscored_word.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
-      else
-        lower_case_and_underscored_word.to_s[0].chr.downcase + camelize(lower_case_and_underscored_word)[1..-1]
-      end
-    end
-
-    # iDeal doesn't really seem to care about nice looking keys in their XML.
-    # Probably some Java XML class, hence the method name.
-    def javaize_key(key)
-      key = key.to_s
-      case key
-      when 'acquirer_transaction_request'
-        'AcquirerTrxReq'
-      when 'acquirer_status_request'
-        'AcquirerStatusReq'
-      when 'directory_request'
-        'DirectoryReq'
-      when 'issuer', 'merchant', 'transaction'
-        key.capitalize
-      when 'created_at'
-        'createDateTimeStamp'
-      when 'merchant_return_url'
-        'merchantReturnURL'
-      when 'token_code', 'expiration_period', 'entrance_code'
-        key[0,1] + camelize(key)[1..-1]
-      when /^(\w+)_id$/
-        "#{$1}ID"
-      else
-        key
-      end
-    end
-
-    # Creates xml with a given hash of tag-value pairs according to the iDeal
-    # requirements.
-    def xml_for(name, tags_and_values)
-      xml = Builder::XmlMarkup.new
-      xml.instruct!
-      xml.tag!(javaize_key(name), 'xmlns' => XML_NAMESPACE, 'version' => API_VERSION) { xml_from_array(xml, tags_and_values) }
-      xml.target!
-    end
-
-    # Recursively creates xml for a given hash of tag-value pair. Uses
-    # javaize_key on the tags to create the tags needed by iDeal.
-    def xml_from_array(builder, tags_and_values)
-      tags_and_values.each do |tag, value|
-        tag = javaize_key(tag)
-        if value.is_a?(Array)
-          builder.tag!(tag) { xml_from_array(builder, value) }
-        else
-          builder.tag!(tag, value)
-        end
-      end
     end
 
     def requires!(options, *keys)
@@ -327,45 +296,40 @@ module Ideal
       end
     end
 
-    def build_status_request_body(options)
+    def build_status_request(options)
       requires!(options, :transaction_id)
 
       timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}#{options[:transaction_id]}"
-
-      xml_for(:acquirer_status_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]],
-
-        [:transaction, [
-          [:transaction_id, options[:transaction_id]]
-        ]]
-      ])
+      Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
+        xml.AcquirerStatusReq(xmlns: XML_NAMESPACE, version: API_VERSION) do |xml|
+          xml.createDateTimestamp created_at_timestamp
+          xml.Merchant do |xml|
+            xml.merchantID self.class.merchant_id
+            xml.subID @sub_id
+          end
+          xml.Transaction do |xml|
+            xml.transactionID options[:transaction_id]
+          end
+          sign!(xml)
+        end
+      end.to_xml
     end
 
-    def build_directory_request_body
+    def build_directory_request
       timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}"
-
-      xml_for(:directory_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]]
-      ])
+      Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
+        xml.DirectoryReq(xmlns: XML_NAMESPACE, version: API_VERSION) do |xml|
+          xml.createDateTimestamp created_at_timestamp
+          xml.Merchant do |xml|
+            xml.merchantID self.class.merchant_id
+            xml.subID @sub_id
+          end
+          sign!(xml)
+        end
+      end.to_xml
     end
 
-    def build_transaction_request_body(money, options)
+    def build_transaction_request(money, options)
       requires!(options, :issuer_id, :expiration_period, :return_url, :order_id, :description, :entrance_code)
 
       enforce_maximum_length(:money, money.to_s, 12)
@@ -374,41 +338,30 @@ module Ideal
       enforce_maximum_length(:entrance_code, options[:entrance_code], 40)
 
       timestamp = created_at_timestamp
-      message = timestamp +
-                options[:issuer_id] +
-                self.class.merchant_id +
-                @sub_id.to_s +
-                options[:return_url] +
-                options[:order_id] +
-                money.to_s +
-                CURRENCY +
-                LANGUAGE +
-                options[:description] +
-                options[:entrance_code]
 
-      xml_for(:acquirer_transaction_request, [
-        [:created_at, timestamp],
-        [:issuer, [[:issuer_id, options[:issuer_id]]]],
-
-        [:merchant, [
-          [:merchant_id,         self.class.merchant_id],
-          [:sub_id,              @sub_id],
-          [:authentication,      AUTHENTICATION_TYPE],
-          [:token,               token],
-          [:token_code,          token_code(message)],
-          [:merchant_return_url, options[:return_url]]
-        ]],
-
-        [:transaction, [
-          [:purchase_id,       options[:order_id]],
-          [:amount,            money],
-          [:currency,          CURRENCY],
-          [:expiration_period, options[:expiration_period]],
-          [:language,          LANGUAGE],
-          [:description,       options[:description]],
-          [:entrance_code,     options[:entrance_code]]
-        ]]
-      ])
+      Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
+        xml.AcquirerTrxReq(xmlns: XML_NAMESPACE, version: API_VERSION) do |xml|
+          xml.createDateTimestamp created_at_timestamp
+          xml.Issuer do |xml|
+            xml.issuerID options[:issuer_id]
+          end
+          xml.Merchant do |xml|
+            xml.merchantID self.class.merchant_id
+            xml.subID 0
+            xml.merchantReturnURL options[:return_url]
+          end
+          xml.Transaction do |xml|
+            xml.purchaseID options[:order_id]
+            xml.amount money
+            xml.currency CURRENCY
+            xml.expirationPeriod options[:expiration_period]
+            xml.language LANGUAGE
+            xml.description options[:description]
+            xml.entranceCode options[:entrance_code]
+          end
+          sign!(xml)
+        end
+      end.to_xml
     end
     
     def log(thing, contents)

@@ -9,7 +9,7 @@ class IdealTest < Test::Unit::TestCase
 
     @gateway = Ideal::Gateway.new
 
-    @@issuer ||= @gateway.issuers.list[0]
+    @@issuer ||= {id: 'RABONL2UXXX'}
 
     @valid_options = {
       :issuer_id         => @@issuer[:id],

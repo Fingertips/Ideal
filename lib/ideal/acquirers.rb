@@ -7,8 +7,8 @@ module Ideal
       'test_url' => 'https://idealtest.secure-ing.com/ideal/iDeal'
     },
     'rabobank' => {
-      'live_url' => 'https://ideal.rabobank.nl/ideal/iDeal',
-      'test_url' => 'https://idealtest.rabobank.nl/ideal/iDeal'
+      'live_url' => 'https://ideal.rabobank.nl/ideal/iDEALv3',
+      'test_url' => 'https://idealtest.rabobank.nl/ideal/iDEALv3'
     },
     'abnamro' => {
       'live_url' => 'https://abnamro.ideal-payment.de/ideal/iDeal',
