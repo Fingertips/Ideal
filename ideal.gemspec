@@ -22,6 +22,7 @@ Gem::Specification.new do |s|
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ["lib"]
 
+  s.add_dependency             "rest"
   s.add_dependency             "nap"
   s.add_dependency             "xmldsig"
   s.add_dependency             "nokogiri"
