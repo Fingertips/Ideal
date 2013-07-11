@@ -1,5 +1,6 @@
 # encoding: utf-8
 
+require 'rest'
 require 'nokogiri'
 require 'xmldsig'
 

@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 require 'openssl'
-require 'rest'
 
 module Ideal
   # === Response classes
@@ -250,10 +249,13 @@ module Ideal
       log('URL', url)
       log('Request', body)
       
-      response = Rest::Client.new.post(
-        url,
-        :body => body
-      )
+      response = REST.post(url, body, {
+        'Content-Type' => 'application/xml; charset=utf-8'
+      }, {
+        :tls_verify      => true,
+        :tls_key         => self.class.private_key,
+        :tls_certificate => self.class.private_certificate
+      })
 
       log('Response', response.body)
       response.body
