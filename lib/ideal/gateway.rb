@@ -1,9 +1,7 @@
 # encoding: utf-8
 
 require 'openssl'
-require 'net/https'
-require 'base64'
-require 'digest/sha1'
+require 'rest'
 
 module Ideal
   # === Response classes
@@ -15,12 +13,6 @@ module Ideal
   # 
   # See the Response class for more information on errors.
   class Gateway
-    AUTHENTICATION_TYPE = 'SHA1_RSA'
-    LANGUAGE = 'nl'
-    CURRENCY = 'EUR'
-    API_VERSION = '1.1.0'
-    XML_NAMESPACE = 'http://www.idealdesk.com/Message'
-
     def self.acquirers
       Ideal::ACQUIRERS
     end
@@ -138,11 +130,19 @@ module Ideal
     #
     #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
     def issuers
-      post_data request_url, build_directory_request_body, DirectoryResponse
+      directory_request = DirectoryRequest.new(
+        :merchant_id => self.class.merchant_id,
+        :sub_id => @sub_id,
+        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+      ).to_xml
+
+      post_data(request_url, 
+                sign_xml(directory_request), 
+                DirectoryResponse) 
     end
 
     # Starts a purchase by sending an acquirer transaction request for the
-    # specified +money+ amount in EURO cents.
+    # specified +money+ amount in EURO with max 2 decimal places.
     #
     # On success returns an TransactionResponse with the #transaction_id
     # which is needed for the capture step. (See capture for an example.)
@@ -162,7 +162,7 @@ module Ideal
     # * <tt>:issuer_id</tt> - The <tt>:id</tt> of an issuer available at the acquirer to which the transaction should be made.
     # * <tt>:order_id</tt> - The order number. Limited to 12 characters.
     # * <tt>:description</tt> - A description of the transaction. Limited to 32 characters.
-    # * <tt>:return_url</tt> - A URL on the merchant’s system to which the consumer is redirected _after_ payment. The acquirer will add the following GET variables:
+    # * <tt>:return_url</tt> - A URL on the merchant's system to which the consumer is redirected _after_ payment. The acquirer will add the following GET variables:
     #   * <tt>trxid</tt> - The <tt>:order_id</tt>.
     #   * <tt>ec</tt> - The <tt>:entrance_code</tt> _if_ it was specified.
     #
@@ -186,7 +186,31 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def setup_purchase(money, options)
-      post_data request_url, build_transaction_request_body(money, options), TransactionResponse
+      requires!(options, :issuer_id, :expiration_period, :return_url, :order_id, :description, :entrance_code)
+
+      enforce_maximum_length(:money, money.to_s, 12)
+      enforce_maximum_length(:order_id, options[:order_id], 12)
+      enforce_maximum_length(:description, options[:description], 32)
+      enforce_maximum_length(:entrance_code, options[:entrance_code], 40)
+
+      transaction_request = TransactionRequest.new(
+        :merchant_id => self.class.merchant_id,
+        :sub_id => @sub_id,
+        :return_url => options[:return_url],
+        :issuer_id => options[:issuer_id],
+        :purchase_id => options[:order_id],
+        :amount => money,
+        :currency => CURRENCY,
+        :expiration_period => options[:expiration_period],
+        :language => LANGUAGE,
+        :description => options[:description],
+        :entrance_code => options[:entrance_code],
+        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+      ).to_xml
+
+      post_data(request_url,
+                sign_xml(transaction_request), 
+                TransactionResponse)
     end
 
     # Sends a acquirer status request for the specified +transaction_id+ and
@@ -206,7 +230,18 @@ module Ideal
     #
     # See the Gateway class description for a more elaborate example.
     def capture(transaction_id)
-      post_data request_url, build_status_request_body(:transaction_id => transaction_id), StatusResponse
+      requires!({:transaction_id => transaction_id}, :transaction_id)
+
+      status_request = StatusRequest.new(
+        :merchant_id => self.class.merchant_id,
+        :sub_id => @sub_id,
+        :transaction_id => transaction_id,
+        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+      ).to_xml
+
+      post_data(request_url, 
+                sign_xml(status_request), 
+                StatusResponse)
     end
 
     private
@@ -214,13 +249,12 @@ module Ideal
     def ssl_post(url, body)
       log('URL', url)
       log('Request', body)
-      response = REST.post(url, body, {
-        'Content-Type' => 'application/xml; charset=utf-8'
-      }, {
-        :tls_verify      => true,
-        :tls_key         => self.class.private_key,
-        :tls_certificate => self.class.private_certificate
-      })
+      
+      response = Rest::Client.new.post(
+        url,
+        :body => body
+      )
+
       log('Response', response.body)
       response.body
     end
@@ -240,83 +274,10 @@ module Ideal
       raise ArgumentError, "The value for `#{key}' contains diacritical characters `#{string}'." if string =~ DIACRITICAL_CHARACTERS
     end
 
-    # Returns the +token+ as specified in section 2.8.4 of the iDeal specs.
-    #
-    # This is the params['AcquirerStatusRes']['Signature']['fingerprint'] in
-    # a StatusResponse instance.
-    def token
-      Digest::SHA1.hexdigest(self.class.private_certificate.to_der).upcase
-    end
-
-    def strip_whitespace(str)
-      str.gsub(/\s/m,'')
-    end
-
-    # Creates a +tokenCode+ from the specified +message+.
-    def token_code(message)
-      signature = self.class.private_key.sign(OpenSSL::Digest::SHA1.new, strip_whitespace(message))
-      strip_whitespace(Base64.encode64(signature))
-    end
-
-    # Returns a string containing the current UTC time, formatted as per the
-    # iDeal specifications, except we don't use miliseconds.
-    def created_at_timestamp
-      Time.now.gmtime.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    end
-
-    def camelize(lower_case_and_underscored_word, first_letter_in_uppercase = true)
-      if first_letter_in_uppercase
-        lower_case_and_underscored_word.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
-      else
-        lower_case_and_underscored_word.to_s[0].chr.downcase + camelize(lower_case_and_underscored_word)[1..-1]
-      end
-    end
-
-    # iDeal doesn't really seem to care about nice looking keys in their XML.
-    # Probably some Java XML class, hence the method name.
-    def javaize_key(key)
-      key = key.to_s
-      case key
-      when 'acquirer_transaction_request'
-        'AcquirerTrxReq'
-      when 'acquirer_status_request'
-        'AcquirerStatusReq'
-      when 'directory_request'
-        'DirectoryReq'
-      when 'issuer', 'merchant', 'transaction'
-        key.capitalize
-      when 'created_at'
-        'createDateTimeStamp'
-      when 'merchant_return_url'
-        'merchantReturnURL'
-      when 'token_code', 'expiration_period', 'entrance_code'
-        key[0,1] + camelize(key)[1..-1]
-      when /^(\w+)_id$/
-        "#{$1}ID"
-      else
-        key
-      end
-    end
-
-    # Creates xml with a given hash of tag-value pairs according to the iDeal
-    # requirements.
-    def xml_for(name, tags_and_values)
-      xml = Builder::XmlMarkup.new
-      xml.instruct!
-      xml.tag!(javaize_key(name), 'xmlns' => XML_NAMESPACE, 'version' => API_VERSION) { xml_from_array(xml, tags_and_values) }
-      xml.target!
-    end
-
-    # Recursively creates xml for a given hash of tag-value pair. Uses
-    # javaize_key on the tags to create the tags needed by iDeal.
-    def xml_from_array(builder, tags_and_values)
-      tags_and_values.each do |tag, value|
-        tag = javaize_key(tag)
-        if value.is_a?(Array)
-          builder.tag!(tag) { xml_from_array(builder, value) }
-        else
-          builder.tag!(tag, value)
-        end
+    def sign_xml(xml)
+      unsigned_document = Xmldsig::SignedDocument.new(xml)
+      signed_xml = unsigned_document.sign do |data|
+        self.class.private_key.sign(OpenSSL::Digest::SHA256.new, data)
       end
     end
 
@@ -325,90 +286,6 @@ module Ideal
       unless missing.empty?
         raise ArgumentError, "Missing required options: #{missing.map { |m| m.to_s }.join(', ')}"
       end
-    end
-
-    def build_status_request_body(options)
-      requires!(options, :transaction_id)
-
-      timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}#{options[:transaction_id]}"
-
-      xml_for(:acquirer_status_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]],
-
-        [:transaction, [
-          [:transaction_id, options[:transaction_id]]
-        ]]
-      ])
-    end
-
-    def build_directory_request_body
-      timestamp = created_at_timestamp
-      message = "#{timestamp}#{self.class.merchant_id}#{@sub_id}"
-
-      xml_for(:directory_request, [
-        [:created_at,       timestamp],
-        [:merchant, [
-          [:merchant_id,    self.class.merchant_id],
-          [:sub_id,         @sub_id],
-          [:authentication, AUTHENTICATION_TYPE],
-          [:token,          token],
-          [:token_code,     token_code(message)]
-        ]]
-      ])
-    end
-
-    def build_transaction_request_body(money, options)
-      requires!(options, :issuer_id, :expiration_period, :return_url, :order_id, :description, :entrance_code)
-
-      enforce_maximum_length(:money, money.to_s, 12)
-      enforce_maximum_length(:order_id, options[:order_id], 12)
-      enforce_maximum_length(:description, options[:description], 32)
-      enforce_maximum_length(:entrance_code, options[:entrance_code], 40)
-
-      timestamp = created_at_timestamp
-      message = timestamp +
-                options[:issuer_id] +
-                self.class.merchant_id +
-                @sub_id.to_s +
-                options[:return_url] +
-                options[:order_id] +
-                money.to_s +
-                CURRENCY +
-                LANGUAGE +
-                options[:description] +
-                options[:entrance_code]
-
-      xml_for(:acquirer_transaction_request, [
-        [:created_at, timestamp],
-        [:issuer, [[:issuer_id, options[:issuer_id]]]],
-
-        [:merchant, [
-          [:merchant_id,         self.class.merchant_id],
-          [:sub_id,              @sub_id],
-          [:authentication,      AUTHENTICATION_TYPE],
-          [:token,               token],
-          [:token_code,          token_code(message)],
-          [:merchant_return_url, options[:return_url]]
-        ]],
-
-        [:transaction, [
-          [:purchase_id,       options[:order_id]],
-          [:amount,            money],
-          [:currency,          CURRENCY],
-          [:expiration_period, options[:expiration_period]],
-          [:language,          LANGUAGE],
-          [:description,       options[:description]],
-          [:entrance_code,     options[:entrance_code]]
-        ]]
-      ])
     end
     
     def log(thing, contents)

@@ -2,8 +2,6 @@
 
 require 'cgi'
 require 'openssl'
-require 'base64'
-require 'rexml/document'
 
 module Ideal
   # The base class for all iDEAL response classes.
@@ -14,8 +12,8 @@ module Ideal
     attr_accessor :response
 
     def initialize(response_body, options = {})
-      @response = REXML::Document.new(response_body).root
-      @success = !error_occured?
+      @response = response_body
+      @document = Nokogiri::XML::Document.parse(response_body).remove_namespaces!
       @test = options[:test]
     end
 
@@ -26,7 +24,7 @@ module Ideal
 
     # Returns whether the request was a success
     def success?
-      @success
+      transaction_successful?
     end
 
     # Returns a technical error message.
@@ -130,19 +128,32 @@ module Ideal
     # * <tt>AP2900</tt> - Selected currency not supported.
     # * <tt>AP2910</tt> - Maximum amount exceeded. (Detailed record states the maximum amount).
     # * <tt>AP2915</tt> - Amount too low. (Detailed record states the minimum amount).
-    # * <tt>AP2920</tt> - Please adjust expiration period. See suggested expiration period.
     def error_code
       text('//errorCode') unless success?
     end
 
     private
 
+    # Returns whether or not the authenticity of the message could be
+    # verified.
+    def verified?
+      signed_document = Xmldsig::SignedDocument.new(@response)
+      signed_document.validate do |signature_value, data|
+        Ideal::Gateway.ideal_certificate.public_key.verify(OpenSSL::Digest::SHA256.new, signature_value, data)
+      end
+    end
+
+    # Checks if no errors occured _and_ if the message was authentic.
+    def transaction_successful?
+      !error_occured? && verified?
+    end
+
     def error_occured?
-      @response.name == 'ErrorRes'
+      @document.root.name == 'ErrorRes'
     end
 
     def text(path)
-      @response.get_text(path).to_s
+      @document.root.xpath(path).text
     end
   end
 
@@ -182,7 +193,6 @@ module Ideal
   class StatusResponse < Response
     def initialize(response_body, options = {})
       super
-      @success = transaction_successful?
     end
 
     # Returns the status message, which is one of: <tt>:success</tt>,
@@ -193,28 +203,20 @@ module Ideal
       status.downcase.to_sym unless (status.strip == '')
     end
 
-    # Returns whether or not the authenticity of the message could be
-    # verified.
-    def verified?
-      @verified ||= Ideal::Gateway.ideal_certificate.public_key.
-                      verify(OpenSSL::Digest::SHA1.new, signature, message)
-    end
-
-    # Returns the bankaccount number when the transaction was successful.
-    def consumer_account_number
-      text('//consumerAccountNumber')
-    end
-
     # Returns the name on the bankaccount of the customer when the 
     # transaction was successful.
     def consumer_name
       text('//consumerName')
     end
 
-    # Returns the city on the bankaccount of the customer when the
-    # transaction was successful.
-    def consumer_city
-      text('//consumerCity')
+    # Returns the consumers IBAN
+    def consumerIBAN
+      text('//consumerIBAN')
+    end
+
+    # Returns the consumers BIC
+    def consumerBIC
+      text('//consumerBIC')
     end
 
     private
@@ -223,28 +225,32 @@ module Ideal
     def transaction_successful?
       !error_occured? && status == :success && verified?
     end
-
-    # The message that we need to verify the authenticity.
-    def message
-      text('//createDateTimeStamp') + text('//transactionID') + text('//status') + text('//consumerAccountNumber')
-    end
-
-    def signature
-      Base64.decode64(text('//signatureValue'))
-    end
   end
 
   # An instance of DirectoryResponse is returned from
   # Gateway#issuers which returns the list of issuers available at the
   # acquirer.
   class DirectoryResponse < Response
-    # Returns a list of issuers available at the acquirer.
-    #
-    #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }]
+    # Returns the directory timestamp. It is NOT allowed to 
+    # fire more than one DirectoryRequest per day.
+    def directory_timestamp
+      text('//directoryDateTimeStamp')
+    end
+
+    # Returns a list of countries with issuers available at the acquirer.
+    #   gateway.issuers.list # => [{ :country => 'Nederland', :issuers => [{:bic => 1}, {:name => 'Test'}]}]
     def list
-      @response.get_elements('//Issuer').map do |issuer|
-        { :id => issuer.get_text('issuerID').to_s, :name => issuer.get_text('issuerName').to_s }
-      end
+      @document.root.xpath('//Country').map do |country|
+        { 
+          :country => country.at('countryNames').text,
+          :issuers => country.xpath('Issuer').map do |issuer|
+            {
+              :bic => issuer.at('issuerID').text,
+              :name => issuer.at('issuerName').text
+            }
+          end
+        }
+      end      
     end
   end
 end
