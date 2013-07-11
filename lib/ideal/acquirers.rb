@@ -11,8 +11,8 @@ module Ideal
       'test_url' => 'https://idealtest.rabobank.nl/ideal/iDEALv3'
     },
     'abnamro' => {
-      'live_url' => 'https://abnamro.ideal-payment.de/ideal/iDEALv3',
-      'test_url' => 'https://abnamro-test.ideal-payment.de/ideal/iDEALv3'
+      'live_url' => 'https://abnamro.ideal-payment.de/ideal/iDeal',
+      'test_url' => 'https://abnamro-test.ideal-payment.de/ideal/iDeal'
     }
   }
 end

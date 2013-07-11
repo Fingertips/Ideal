@@ -138,9 +138,7 @@ module Ideal
     # verified.
     def verified?
       signed_document = Xmldsig::SignedDocument.new(@response)
-      signed_document.validate do |signature_value, data|
-        Ideal::Gateway.ideal_certificate.public_key.verify(OpenSSL::Digest::SHA256.new, signature_value, data)
-      end
+      @verified ||= signed_document.validate(Ideal::Gateway.ideal_certificate)
     end
 
     # Checks if no errors occured _and_ if the message was authentic.

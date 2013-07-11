@@ -133,11 +133,11 @@ module Ideal
       directory_request = DirectoryRequest.new(
         :merchant_id => self.class.merchant_id,
         :sub_id => @sub_id,
-        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+        :key => fingerprint
       ).to_xml
 
       post_data(request_url, 
-                sign_xml(directory_request), 
+                sign!(directory_request), 
                 DirectoryResponse) 
     end
 
@@ -205,11 +205,11 @@ module Ideal
         :language => LANGUAGE,
         :description => options[:description],
         :entrance_code => options[:entrance_code],
-        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+        :key => fingerprint
       ).to_xml
 
       post_data(request_url,
-                sign_xml(transaction_request), 
+                sign!(transaction_request), 
                 TransactionResponse)
     end
 
@@ -236,11 +236,11 @@ module Ideal
         :merchant_id => self.class.merchant_id,
         :sub_id => @sub_id,
         :transaction_id => transaction_id,
-        :key => Digest::SHA1.hexdigest(self.class.private_certificate.to_der)
+        :key => fingerprint
       ).to_xml
 
       post_data(request_url, 
-                sign_xml(status_request), 
+                sign!(status_request), 
                 StatusResponse)
     end
 
@@ -274,11 +274,12 @@ module Ideal
       raise ArgumentError, "The value for `#{key}' contains diacritical characters `#{string}'." if string =~ DIACRITICAL_CHARACTERS
     end
 
-    def sign_xml(xml)
-      unsigned_document = Xmldsig::SignedDocument.new(xml)
-      signed_xml = unsigned_document.sign do |data|
-        self.class.private_key.sign(OpenSSL::Digest::SHA256.new, data)
-      end
+    def sign!(xml)
+      Xmldsig::SignedDocument.new(xml).sign Ideal::Gateway.private_key
+    end
+
+    def fingerprint
+      Digest::SHA1.hexdigest(Ideal::Gateway.private_certificate.to_der)
     end
 
     def requires!(options, *keys)
