@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 require 'openssl'
+require 'tempfile'
 
 module Ideal
   # === Response classes
@@ -32,6 +33,8 @@ module Ideal
 
       # Holds the test and production urls for your iDeal acquirer.
       attr_accessor :live_url, :test_url
+
+      attr_accessor :private_key_file_path, :ideal_certificate_file_path
     end
 
     # Environment defaults to test
@@ -39,6 +42,7 @@ module Ideal
 
     # Loads the global merchant private_key from disk.
     def self.private_key_file=(pkey_file)
+      self.private_key_file_path = pkey_file
       self.private_key = File.read(pkey_file)
     end
 
@@ -71,6 +75,7 @@ module Ideal
 
     # Loads the global merchant ideal_certificate from disk.
     def self.ideal_certificate_file=(certificate_file)
+      self.ideal_certificate_file_path = certificate_file
       self.ideal_certificate = File.read(certificate_file)
     end
 
@@ -130,7 +135,7 @@ module Ideal
     #   gateway.issuers.list # => [{ :id => '1006', :name => 'ABN AMRO Bank' }, …]
     def issuers
       directory_request = DirectoryRequest.new(
-        :merchant_id => self.class.merchant_id,
+        :merchant_id => Ideal::Gateway.merchant_id,
         :sub_id => @sub_id,
         :key => fingerprint
       ).to_xml
@@ -193,7 +198,7 @@ module Ideal
       enforce_maximum_length(:entrance_code, options[:entrance_code], 40)
 
       transaction_request = TransactionRequest.new(
-        :merchant_id => self.class.merchant_id,
+        :merchant_id => Ideal::Gateway.merchant_id,
         :sub_id => @sub_id,
         :return_url => options[:return_url],
         :issuer_id => options[:issuer_id],
@@ -232,7 +237,7 @@ module Ideal
       requires!({:transaction_id => transaction_id}, :transaction_id)
 
       status_request = StatusRequest.new(
-        :merchant_id => self.class.merchant_id,
+        :merchant_id => Ideal::Gateway.merchant_id,
         :sub_id => @sub_id,
         :transaction_id => transaction_id,
         :key => fingerprint
@@ -248,7 +253,7 @@ module Ideal
     def ssl_post(url, body)
       log('URL', url)
       log('Request', body)
-      
+
       response = REST.post(url, body, {
         'Content-Type' => 'application/xml; charset=utf-8'
       }, {
@@ -276,8 +281,24 @@ module Ideal
       raise ArgumentError, "The value for `#{key}' contains diacritical characters `#{string}'." if string =~ DIACRITICAL_CHARACTERS
     end
 
+    # def sign!(xml)
+    #   Xmldsig::SignedDocument.new(xml).sign Ideal::Gateway.private_key
+    # end
+
     def sign!(xml)
-      Xmldsig::SignedDocument.new(xml).sign Ideal::Gateway.private_key
+      file = Tempfile.new('unsigned-doc')
+
+      begin
+        file.write(xml)
+        file.rewind
+
+        output = %x[xmlsec1 --sign --privkey-pem #{Ideal::Gateway.private_key_file_path} --pwd #{Ideal::Gateway.passphrase} #{file.path}]
+      ensure
+         file.close
+         file.unlink
+      end
+
+      output
     end
 
     def fingerprint

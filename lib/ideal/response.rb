@@ -2,6 +2,7 @@
 
 require 'cgi'
 require 'openssl'
+require 'tempfile'
 
 module Ideal
   # The base class for all iDEAL response classes.
@@ -136,9 +137,26 @@ module Ideal
 
     # Returns whether or not the authenticity of the message could be
     # verified.
+    # def verified?
+    #   signed_document = Xmldsig::SignedDocument.new(@response)
+    #   @verified ||= signed_document.validate(Ideal::Gateway.ideal_certificate)
+    # end
+
+    # Returns whether or not the authenticity of the message could be
+    # verified.
     def verified?
-      signed_document = Xmldsig::SignedDocument.new(@response)
-      @verified ||= signed_document.validate(Ideal::Gateway.ideal_certificate)
+      xml = Nokogiri::XML::Document.parse(@response).to_xml(:save_with => Nokogiri::XML::Node::SaveOptions::AS_XML)
+
+      file = Tempfile.new('signed-doc')
+      begin
+        file.write(xml)
+        file.rewind
+
+        @verified ||= %x[xmlsec1 --verify --pubkey-cert-pem #{Ideal::Gateway.ideal_certificate_file_path} #{file.path}] ; result=$?.success?
+      ensure
+         file.close
+         file.unlink
+      end
     end
 
     # Checks if no errors occured _and_ if the message was authentic.
