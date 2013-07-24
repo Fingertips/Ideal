@@ -47,8 +47,8 @@ Messages between you and the acquirer are all signed in order to prove their aut
 
 To create a self-signed certificate follow these steps:
 
-* /usr/bin/openssl genrsa -des3 -out private_key.pem -passout pass:the_passphrase 1024
-* /usr/bin/openssl req -x509 -new -key private_key.pem -passin pass:the_passphrase -days 3650 -out private_certificate.cer
+* /usr/bin/openssl genrsa -aes128 -out private_key.pem -passout pass:the_passphrase 2048
+* /usr/bin/openssl req -x509 -sha256 -new -key private_key.pem -passin pass:the_passphrase -days 1825 -out private_certificate.cer
 
 Substitute _the_passphrase_ with your own passphrase. You will need to configure that passphrase later on, so hand on to it.
 
